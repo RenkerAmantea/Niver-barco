@@ -1,0 +1,9 @@
+{
+  "buildCommand": "pnpm --filter @workspace/niver build",
+  "outputDirectory": "artifacts/niver/dist/public",
+  "framework": "vite",
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/[...path].js" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
