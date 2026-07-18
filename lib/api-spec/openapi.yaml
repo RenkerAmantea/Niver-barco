@@ -3,13 +3,20 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Renker Niver de Bolso — Birthday party guest confirmation API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: guests
+    description: Guest registration and RSVP
+  - name: posts
+    description: Forum posts and replies
+  - name: stats
+    description: Party statistics
+
 paths:
   /healthz:
     get:
@@ -24,6 +31,182 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /guests:
+    get:
+      operationId: listGuests
+      tags: [guests]
+      summary: List all guests
+      description: Returns all guests with their RSVP status
+      responses:
+        "200":
+          description: List of guests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Guest"
+    post:
+      operationId: createGuest
+      tags: [guests]
+      summary: Register a guest
+      description: Register a guest with a name (and optional Google info)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GuestInput"
+      responses:
+        "201":
+          description: Guest registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Guest"
+        "409":
+          description: Guest already exists
+
+  /guests/{guestId}:
+    get:
+      operationId: getGuest
+      tags: [guests]
+      summary: Get a guest by ID
+      parameters:
+        - name: guestId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Guest found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Guest"
+        "404":
+          description: Guest not found
+
+  /guests/{guestId}/rsvp:
+    patch:
+      operationId: updateRsvp
+      tags: [guests]
+      summary: Update RSVP status
+      parameters:
+        - name: guestId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RsvpUpdate"
+      responses:
+        "200":
+          description: RSVP updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Guest"
+        "404":
+          description: Guest not found
+
+  /stats/rsvp-summary:
+    get:
+      operationId: getRsvpSummary
+      tags: [stats]
+      summary: Get RSVP summary
+      description: Returns counts for each RSVP status
+      responses:
+        "200":
+          description: RSVP summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RsvpSummary"
+
+  /posts:
+    get:
+      operationId: listPosts
+      tags: [posts]
+      summary: List all forum posts
+      description: Returns all posts in reverse chronological order
+      responses:
+        "200":
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+    post:
+      operationId: createPost
+      tags: [posts]
+      summary: Create a forum post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInput"
+      responses:
+        "201":
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/{postId}/replies:
+    get:
+      operationId: listReplies
+      tags: [posts]
+      summary: List replies for a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of replies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reply"
+    post:
+      operationId: createReply
+      tags: [posts]
+      summary: Reply to a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplyInput"
+      responses:
+        "201":
+          description: Reply created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reply"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +217,149 @@ components:
       required:
         - status
 
+    Guest:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        googleId:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        rsvpStatus:
+          type: string
+          enum: [going, maybe, not_going, pending]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - rsvpStatus
+        - createdAt
+
+    GuestInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        googleId:
+          type: string
+        avatarUrl:
+          type: string
+        rsvpStatus:
+          type: string
+          enum: [going, maybe, not_going, pending]
+      required:
+        - name
+
+    RsvpUpdate:
+      type: object
+      properties:
+        rsvpStatus:
+          type: string
+          enum: [going, maybe, not_going]
+      required:
+        - rsvpStatus
+
+    RsvpSummary:
+      type: object
+      properties:
+        going:
+          type: integer
+        maybe:
+          type: integer
+        notGoing:
+          type: integer
+        pending:
+          type: integer
+        total:
+          type: integer
+      required:
+        - going
+        - maybe
+        - notGoing
+        - pending
+        - total
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        guestId:
+          type: integer
+        guestName:
+          type: string
+        guestAvatarUrl:
+          type: ["string", "null"]
+        content:
+          type: string
+        replyCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - guestId
+        - guestName
+        - content
+        - replyCount
+        - createdAt
+
+    PostInput:
+      type: object
+      properties:
+        guestId:
+          type: integer
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required:
+        - guestId
+        - content
+
+    Reply:
+      type: object
+      properties:
+        id:
+          type: integer
+        postId:
+          type: integer
+        guestId:
+          type: integer
+        guestName:
+          type: string
+        guestAvatarUrl:
+          type: ["string", "null"]
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - postId
+        - guestId
+        - guestName
+        - content
+        - createdAt
+
+    ReplyInput:
+      type: object
+      properties:
+        guestId:
+          type: integer
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required:
+        - guestId
+        - content
