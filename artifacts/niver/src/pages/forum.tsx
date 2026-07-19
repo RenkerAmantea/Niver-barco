@@ -4,12 +4,9 @@ import { useSession } from "@/hooks/use-session";
 import { 
   useListPosts, 
   useCreatePost, 
-  useListReplies, 
-  useCreateReply, 
+  useListGuests,
   getListPostsQueryKey, 
-  getListRepliesQueryKey,
-  Post,
-  Reply
+  Post
 } from "@workspace/api-client-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -18,8 +15,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Anchor, BadgeCheck, CornerDownRight, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Send, Sparkles, X } from "lucide-react";
+import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PostReplies } from "@/components/post-replies";
 
 const reactionOptions = [
   { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/30 text-pink-100', iconClass: 'fill-pink-400 text-pink-200' },
@@ -34,7 +32,8 @@ function splitPhotoPost(content: string) {
   if (!content.startsWith(photoMarker)) return null;
   const end = content.indexOf(']]');
   if (end < 0) return null;
-  return { url: content.slice(photoMarker.length, end), caption: content.slice(end + 2).trim() };
+  const [url, source = 'mural'] = content.slice(photoMarker.length, end).split('|');
+  return { url, source, caption: content.slice(end + 2).trim() };
 }
 
 function ReactionBar({ postId }: { postId: number }) {
@@ -63,97 +62,6 @@ function ReactionBar({ postId }: { postId: number }) {
   })}</div>;
 }
 
-function PostReplies({ postId }: { postId: number }) {
-  const { session } = useSession();
-  const [content, setContent] = useState("");
-  const { data: replies, isLoading } = useListReplies(postId, { query: { enabled: !!postId, queryKey: getListRepliesQueryKey(postId) }});
-  const createReply = useCreateReply();
-  const queryClient = useQueryClient();
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim() || !session?.id) return;
-
-    createReply.mutate(
-      { postId, data: { guestId: session.id, content: content.trim() } },
-      {
-        onSuccess: (newReply) => {
-          setContent("");
-          queryClient.setQueryData(getListRepliesQueryKey(postId), (old: Reply[] | undefined) => {
-            return old ? [...old, newReply] : [newReply];
-          });
-          // Optimistically increment post reply count
-          queryClient.setQueryData(getListPostsQueryKey(), (old: Post[] | undefined) => {
-            if (!old) return old;
-            return old.map(p => p.id === postId ? { ...p, replyCount: p.replyCount + 1 } : p);
-          });
-        }
-      }
-    );
-  };
-
-  if (isLoading) return <div className="text-sm text-muted-foreground pl-12 py-2">Carregando respostas...</div>;
-
-  return (
-    <div className="ml-0 space-y-4 pt-4 md:ml-6 md:border-l md:border-white/5 md:pl-12">
-      {replies?.map((reply) => (
-        <div key={reply.id} className="relative flex min-w-0 gap-2.5 md:gap-3">
-          <CornerDownRight className="absolute -left-6 top-3 hidden h-4 w-4 text-white/10 md:block" />
-          <Avatar className="h-8 w-8 border-primary/20 shrink-0">
-            {reply.guestAvatarUrl ? <AvatarImage src={reply.guestAvatarUrl} alt={reply.guestName} /> : null}
-            <AvatarFallback className="text-xs bg-secondary text-primary">
-              {reply.guestName.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1 rounded-2xl rounded-tl-none border border-white/5 bg-black/30 px-3.5 py-2">
-            <div className="mb-1 flex min-w-0 items-baseline justify-between gap-2">
-              <span className="truncate text-sm font-medium text-foreground">{reply.guestName}</span>
-              <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">
-                {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: ptBR })}
-              </span>
-            </div>
-            <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">{reply.content}</p>
-          </div>
-        </div>
-      ))}
-
-      <form onSubmit={handleSubmit} className="relative mt-4 flex min-w-0 gap-2.5 md:gap-3">
-        <CornerDownRight className="absolute -left-6 top-3 hidden h-4 w-4 text-white/10 md:block" />
-        <Avatar className="h-8 w-8 border-primary/20 shrink-0">
-          <AvatarFallback className="text-xs bg-secondary text-primary">
-            {session?.name.charAt(0).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex min-w-0 flex-1 gap-2">
-          <Textarea
-            ref={inputRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Escreva uma resposta..."
-            className="min-h-[40px] h-[40px] py-2 resize-none rounded-xl text-sm bg-black/40 border-white/10 focus-visible:ring-primary/50"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-          />
-          <Button 
-            type="submit" 
-            size="icon" 
-            disabled={!content.trim() || createReply.isPending}
-            className="h-[40px] w-[40px] rounded-xl shrink-0 bg-primary/20 text-primary hover:bg-primary/30 hover:text-primary-foreground border border-primary/30"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-
 export default function Forum() {
   const { session } = useSession();
   const [, setLocation] = useLocation();
@@ -165,8 +73,12 @@ export default function Forum() {
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
 
   const { data: posts, isLoading: isLoadingPosts } = useListPosts();
+  const { data: guests } = useListGuests();
   const createPost = useCreatePost();
   const queryClient = useQueryClient();
+  const mentionMatch = content.match(/@([^\s]*)$/);
+  const mentionChoices = mentionMatch ? (guests ?? []).filter((guest) => guest.name.toLowerCase().includes(mentionMatch[1].toLowerCase())).slice(0, 4) : [];
+  const selectMention = (name: string) => setContent((current) => current.replace(/@[^\s]*$/, `@${name} `));
 
   useEffect(() => {
     if (!session) {
@@ -181,7 +93,7 @@ export default function Forum() {
     if ((!content.trim() && !photoUrl) || !session?.id) return;
 
     createPost.mutate(
-      { data: { guestId: session.id, content: photoUrl ? `${photoMarker}${photoUrl}]]${content.trim()}` : content.trim() } },
+      { data: { guestId: session.id, content: photoUrl ? `${photoMarker}${photoUrl}|mural]]${content.trim()}` : content.trim() } },
       {
         onSuccess: (newPost) => {
           setContent("");
@@ -244,6 +156,7 @@ export default function Forum() {
                 placeholder={`No que você está pensando, ${session.name.split(' ')[0]}?`}
                 className="forum-composer bg-black/25 border-white/10 text-base leading-relaxed focus-visible:ring-primary/50 resize-y min-h-[108px]"
               />
+              {mentionChoices.length > 0 && <div className="relative z-20 -mt-2 w-full max-w-xs overflow-hidden rounded-xl border border-white/12 bg-[#101126] shadow-2xl">{mentionChoices.map((guest) => <button key={guest.id} type="button" onClick={() => selectMention(guest.name)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-white/5"><span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-xs text-primary">{guest.name[0]}</span>{guest.name}</button>)}</div>}
               <input ref={photoInputRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={handlePhotoSelect} />
               {photoUrl && <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30"><img src={photoUrl} alt="Prévia da foto a publicar" className="max-h-64 w-full object-cover" /><button type="button" onClick={() => setPhotoUrl(null)} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/65 text-white hover:bg-black"><X className="h-4 w-4" /></button></div>}
               {photoError && <p className="text-sm text-red-200">{photoError}</p>}
@@ -289,7 +202,7 @@ export default function Forum() {
           </div>
         ) : (
           posts?.map((post) => (
-            <Card key={post.id} className="forum-post bg-black/20 border-white/5 overflow-hidden transition-all hover:border-white/10">
+            <Card key={post.id} id={`post-${post.id}`} className="forum-post bg-black/20 border-white/5 overflow-hidden transition-all hover:border-white/10">
               <CardContent className="p-4 sm:p-6 pb-4">
                 <div className="flex min-w-0 gap-3 sm:gap-4">
                   <Avatar className="h-12 w-12 border-primary/20 shrink-0">
@@ -330,7 +243,7 @@ export default function Forum() {
 
                 {expandedPostId === post.id && (
                   <div className="mt-2 animate-in slide-in-from-top-2 duration-300">
-                    <PostReplies postId={post.id} />
+                    <PostReplies postId={post.id} replyTo={post.guestName} />
                   </div>
                 )}
               </CardContent>

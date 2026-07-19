@@ -7,6 +7,7 @@ export interface GuestSession {
 }
 
 const SESSION_KEY = 'niver_session';
+const LAST_SESSION_KEY = 'niver_last_session';
 const SESSION_EVENT = 'niver-session-changed';
 
 function readSession(): GuestSession | null {
@@ -18,8 +19,13 @@ function readSession(): GuestSession | null {
   }
 }
 
+function readLastSession(): GuestSession | null {
+  try { const saved = localStorage.getItem(LAST_SESSION_KEY); return saved ? JSON.parse(saved) : null; } catch { return null; }
+}
+
 export function useSession() {
   const [session, setSessionState] = useState<GuestSession | null>(readSession);
+  const [lastSession, setLastSession] = useState<GuestSession | null>(readLastSession);
 
   useEffect(() => {
     const syncSession = () => setSessionState(readSession());
@@ -33,7 +39,9 @@ export function useSession() {
 
   const saveSession = useCallback((newSession: GuestSession) => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
+    localStorage.setItem(LAST_SESSION_KEY, JSON.stringify(newSession));
     setSessionState(newSession);
+    setLastSession(newSession);
     window.dispatchEvent(new Event(SESSION_EVENT));
   }, []);
 
@@ -43,5 +51,7 @@ export function useSession() {
     window.dispatchEvent(new Event(SESSION_EVENT));
   }, []);
 
-  return { session, saveSession, clearSession };
+  const resumeLastSession = useCallback(() => { const previous = readLastSession(); if (previous) saveSession(previous); }, [saveSession]);
+
+  return { session, lastSession, saveSession, clearSession, resumeLastSession };
 }

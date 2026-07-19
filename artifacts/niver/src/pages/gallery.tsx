@@ -2,6 +2,7 @@ import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Camera, ImagePlus, LoaderCircle, UploadCloud, X } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
+import { PostReplies } from '@/components/post-replies';
 
 type Photo = {
   id: string;
@@ -10,6 +11,9 @@ type Photo = {
   createdAt: string | null;
   guestName: string;
   guestAvatarUrl: string | null;
+  source: 'mural' | 'album';
+  postId: number | null;
+  caption: string;
 };
 
 const acceptedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic']);
@@ -74,7 +78,14 @@ export default function Gallery() {
         body: file,
       });
       if (!uploadResponse.ok) throw new Error('O envio falhou. Tente de novo em alguns segundos.');
-      setMessage('Foto enviada. Ela já entrou para a tripulação.');
+      const postResponse = await fetch('/api/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestId: session.id, content: `[[niver-photo:${signed.publicUrl}|album]]` }),
+      });
+      const post = await postResponse.json();
+      if (!postResponse.ok) throw new Error(post.error ?? 'A foto subiu, mas não conseguimos abrir os comentários ainda.');
+      setMessage('Foto enviada. Ela também ganhou espaço no mural para comentários.');
       await loadPhotos();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Não foi possível enviar a foto.');
@@ -112,7 +123,7 @@ export default function Gallery() {
       ) : (
         <div className="gallery-empty mt-6"><Camera className="mx-auto h-10 w-10 text-primary" /><h2>O convés ainda está sem flagrantes.</h2><p>Inaugura a galeria. A primeira foto pode ser sua.</p></div>
       )}
-      {selected && <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Foto ampliada" onClick={() => setSelected(null)}><div className="relative max-h-full w-full max-w-xl overflow-auto rounded-3xl border border-white/15 bg-[#101126] p-3" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setSelected(null)} className="absolute right-5 top-5 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white"><X className="h-5 w-5" /></button><img src={selected.url} alt={`Foto enviada por ${selected.guestName}`} className="max-h-[68vh] w-full rounded-2xl object-contain" /><div className="p-3"><p className="font-display text-lg text-foreground">{selected.guestName}</p><p className="mt-1 text-sm text-muted-foreground">Foto enviada direto para o álbum.</p></div></div></div>}
+      {selected && <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Foto ampliada" onClick={() => setSelected(null)}><div className="relative max-h-full w-full max-w-xl overflow-auto rounded-3xl border border-white/15 bg-[#101126] p-3" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setSelected(null)} className="absolute right-5 top-5 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white"><X className="h-5 w-5" /></button><img src={selected.url} alt={`Foto enviada por ${selected.guestName}`} className="max-h-[56vh] w-full rounded-2xl object-contain" /><div className="p-3"><p className="font-display text-lg text-foreground">{selected.guestName}</p>{selected.caption && <p className="mt-1 text-sm leading-6 text-foreground/90">{selected.caption}</p>}<div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{selected.source === 'mural' ? 'Publicada pelo mural.' : 'Enviada direto ao álbum.'}</p>{selected.postId && <a href={`/forum#post-${selected.postId}`} className="shrink-0 text-sm font-medium text-primary hover:text-primary/80">Ver no mural</a>}</div>{selected.postId ? <PostReplies postId={selected.postId} /> : <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-3 text-sm text-muted-foreground">Foto antiga do álbum. As novas fotos já podem receber comentários aqui.</p>}</div></div></div>}
     </div>
   );
 }

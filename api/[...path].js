@@ -47,6 +47,13 @@ function publicPhotoUrl(objectName) {
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${objectName.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+function parsePhotoPost(content) {
+  const match = typeof content === 'string' && content.match(/^\[\[niver-photo:([^|\]]+)(?:\|([^\]]+))?\]\]([\s\S]*)$/);
+  if (!match) return null;
+  // The original marker had no source and was only ever created by the mural.
+  return { url: match[1], source: match[2] === 'album' ? 'album' : 'mural', caption: match[3].trim() };
+}
+
 async function readJson(response) {
   const text = await response.text();
   return text ? JSON.parse(text) : null;
@@ -107,6 +114,13 @@ export default async function handler(req, res) {
       const guestsResponse = await rest('niver_barco_guests?select=id,name,avatar_url');
       const guests = await readJson(guestsResponse);
       if (!guestsResponse.ok) return res.status(guestsResponse.status).json(guests);
+      const postsResponse = await rest('niver_barco_posts?select=id,content');
+      const posts = await readJson(postsResponse);
+      if (!postsResponse.ok) return res.status(postsResponse.status).json(posts);
+      const photoPosts = new Map((posts ?? []).flatMap((post) => {
+        const photo = parsePhotoPost(post.content);
+        return photo ? [[photo.url, { ...photo, postId: post.id }]] : [];
+      }));
       const objectResponses = await Promise.all((guests ?? []).map(async (guest) => {
         const response = await storage(`object/list/${PHOTO_BUCKET}`, {
           method: 'POST',
@@ -127,6 +141,7 @@ export default async function handler(req, res) {
           const name = object.name;
           const match = name.match(/^guests\/(\d+)\//);
           const guest = match ? guestById.get(Number(match[1])) : null;
+          const post = photoPosts.get(publicPhotoUrl(name));
           return {
             id: object.id ?? name,
             path: name,
@@ -134,6 +149,9 @@ export default async function handler(req, res) {
             createdAt: object.created_at ?? null,
             guestName: guest?.name ?? 'Tripulação',
             guestAvatarUrl: guest?.avatar_url ?? null,
+            source: post?.source ?? 'album',
+            postId: post?.postId ?? null,
+            caption: post?.caption ?? '',
           };
         });
       return res.status(200).json(photos);

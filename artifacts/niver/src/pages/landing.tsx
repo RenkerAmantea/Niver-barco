@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, HelpCircle, XCircle, ArrowRight, Sparkles } from "lucide-react";
-import { avatarOptions } from '@/lib/avatar-options';
+import { avatarColors, avatarOptions, makeAvatar } from '@/lib/avatar-options';
 
 export default function Landing() {
-  const { session, saveSession } = useSession();
+  const { session, lastSession, saveSession, resumeLastSession } = useSession();
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,7 +32,7 @@ export default function Landing() {
     setIsSubmitting(true);
     try {
       createGuest.mutate(
-      { data: { name: name.trim(), avatarUrl: avatarOptions[Math.floor(Math.random() * avatarOptions.length)].url } },
+      { data: { name: name.trim(), avatarUrl: makeAvatar(avatarOptions[Math.floor(Math.random() * avatarOptions.length)].id, avatarColors[Math.floor(Math.random() * avatarColors.length)]) } },
         {
           onSuccess: (guest) => {
             saveSession({ id: guest.id, name: guest.name, avatarUrl: guest.avatarUrl });
@@ -86,6 +86,7 @@ export default function Landing() {
               {isSubmitting ? "Entrando..." : "Entrar no Evento"} <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </form>
+          {lastSession && <button type="button" onClick={() => { resumeLastSession(); setLocation('/evento'); }} className="mt-5 text-sm text-primary transition hover:text-[#ffe29b]">Já entrou aqui? Retomar perfil de {lastSession.name}</button>}
         </CardContent>
       </Card>
 
