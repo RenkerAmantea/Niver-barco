@@ -27,9 +27,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Link href={session ? "/evento" : "/"} aria-label="Ir para o evento" className="captain-mark flex h-10 w-10 items-center justify-center rounded-xl border border-[#f9d98a]/25 bg-[#f6cc6b]/[.09] text-[#f9d98a] transition-colors hover:bg-[#f6cc6b]/[.17]">
             <ShipWheel className="h-[1.15rem] w-[1.15rem]" />
           </Link>
-          <Link href={session ? "/evento" : "/"} className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap text-center transition-opacity hover:opacity-85">
+          <Link href={session ? "/evento" : "/"} className="absolute left-1/2 flex -translate-x-1/2 flex-col items-center whitespace-nowrap text-center leading-none transition-opacity hover:opacity-85">
             <Waves className="hidden h-3.5 w-3.5 text-[#9d74ff] sm:block" />
             <span className="font-display text-[.7rem] font-semibold uppercase tracking-[.14em] text-[#fff0c8] sm:text-xs sm:tracking-[.18em]">Renker Niver Barco</span>
+            <span className="mt-1 text-[8px] font-medium uppercase tracking-[.16em] text-[#d3c7ec]/70 sm:text-[9px]">Terça-feira · 21 · 19h</span>
           </Link>
 
           {session && (

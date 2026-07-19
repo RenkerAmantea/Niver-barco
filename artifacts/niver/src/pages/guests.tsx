@@ -129,7 +129,7 @@ export default function Guests() {
             <div>
               <h2 className="text-2xl font-display font-semibold mb-2">Sua Presença</h2>
               <p className="text-muted-foreground max-w-md mx-auto">
-                O barco tem capacidade limitada. Por favor, confirme seu status para garantirmos a melhor experiência.
+                Confirma do seu jeito, sem pressão. A lista mostra quem já passou por aqui — os convites continuam chegando.
               </p>
             </div>
 
@@ -196,7 +196,7 @@ export default function Guests() {
       {/* Guest List Tabs */}
       <section>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-display font-semibold">Lista de Convidados</h2>
+          <div><h2 className="text-2xl font-display font-semibold">Quem já respondeu</h2><p className="mt-1 text-sm text-muted-foreground">A tripulação vai aparecendo aos poucos.</p></div>
         </div>
         
         <Tabs defaultValue="going" className="w-full">

@@ -218,6 +218,17 @@
     @apply border-primary/60 bg-primary/20 text-primary;
   }
 
+  .reaction-icon-chip {
+    min-width: 2.25rem;
+    min-height: 2.15rem;
+    justify-content: center;
+    padding: .45rem .58rem;
+    border-color: rgba(255,255,255,.13);
+    background: rgba(255,255,255,.035);
+  }
+
+  .reaction-icon-chip:hover { transform: translateY(-1px); }
+
   .reaction-burst {
     animation: reaction-burst 420ms cubic-bezier(.2, 1.6, .45, 1);
   }

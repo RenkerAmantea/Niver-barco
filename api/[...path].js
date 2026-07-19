@@ -158,7 +158,11 @@ export default async function handler(req, res) {
       });
       const signed = await readJson(signedResponse);
       if (!signedResponse.ok) return res.status(signedResponse.status).json(signed);
-      return res.status(200).json({ path: objectName, uploadUrl: `${SUPABASE_URL}/storage/v1${signed.url}` });
+      return res.status(200).json({
+        path: objectName,
+        publicUrl: publicPhotoUrl(objectName),
+        uploadUrl: `${SUPABASE_URL}/storage/v1${signed.url}`,
+      });
     }
 
     if (req.method === 'GET' && path === '/guests') {

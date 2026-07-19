@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { ChangeEvent, useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
 import { 
@@ -18,12 +18,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MessageSquare, Send, CornerDownRight } from "lucide-react";
+import { Anchor, CornerDownRight, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Send, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const reactionOptions = [
-  { key: 'heart', label: '❤' }, { key: 'fire', label: '🔥' }, { key: 'boat', label: '⚓' }, { key: 'party', label: '✦' },
+  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/20 text-pink-200', iconClass: 'text-pink-300' },
+  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'border-orange-300/55 bg-orange-500/20 text-orange-200', iconClass: 'text-orange-300' },
+  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'border-sky-300/55 bg-sky-500/20 text-sky-200', iconClass: 'text-sky-300' },
+  { key: 'party', label: 'Brilho', icon: Sparkles, activeClass: 'border-violet-300/55 bg-violet-500/20 text-violet-200', iconClass: 'text-violet-200' },
 ];
+
+const photoMarker = '[[niver-photo:';
+
+function splitPhotoPost(content: string) {
+  if (!content.startsWith(photoMarker)) return null;
+  const end = content.indexOf(']]');
+  if (end < 0) return null;
+  return { url: content.slice(photoMarker.length, end), caption: content.slice(end + 2).trim() };
+}
 
 function ReactionBar({ postId }: { postId: number }) {
   const { session } = useSession();
@@ -45,7 +57,10 @@ function ReactionBar({ postId }: { postId: number }) {
     if (!active) { setBurst(emoji); window.setTimeout(() => setBurst(null), 420); }
     void load();
   };
-  return <div className="flex flex-wrap gap-2 pt-3">{reactionOptions.map(({ key, label }) => <button key={key} onClick={() => void toggle(key)} aria-label={`Reagir com ${key}`} className={cn("reaction-chip cursor-pointer", reactions[key]?.reacted && "reaction-chip-active", burst === key && "reaction-burst")}><span>{label}</span>{reactions[key]?.count > 0 && <span>{reactions[key].count}</span>}</button>)}</div>;
+  return <div className="flex flex-wrap gap-2 pt-3">{reactionOptions.map(({ key, label, icon: Icon, activeClass, iconClass }) => {
+    const active = reactions[key]?.reacted;
+    return <button key={key} type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className={cn("reaction-chip reaction-icon-chip cursor-pointer", active && activeClass, burst === key && "reaction-burst")}><Icon className={cn("h-4 w-4", iconClass, active && key === 'heart' && 'fill-current')} />{reactions[key]?.count > 0 && <span>{reactions[key].count}</span>}</button>;
+  })}</div>;
 }
 
 function PostReplies({ postId }: { postId: number }) {
@@ -143,6 +158,10 @@ export default function Forum() {
   const { session } = useSession();
   const [, setLocation] = useLocation();
   const [content, setContent] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
 
   const { data: posts, isLoading: isLoadingPosts } = useListPosts();
@@ -159,19 +178,41 @@ export default function Forum() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || !session?.id) return;
+    if ((!content.trim() && !photoUrl) || !session?.id) return;
 
     createPost.mutate(
-      { data: { guestId: session.id, content: content.trim() } },
+      { data: { guestId: session.id, content: photoUrl ? `${photoMarker}${photoUrl}]]${content.trim()}` : content.trim() } },
       {
         onSuccess: (newPost) => {
           setContent("");
+          setPhotoUrl(null);
           queryClient.setQueryData(getListPostsQueryKey(), (old: Post[] | undefined) => {
             return old ? [newPost, ...old] : [newPost];
           });
         }
       }
     );
+  };
+
+  const handlePhotoSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !session?.id) return;
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      setPhotoError('Use JPG, PNG, WebP ou HEIC de até 8 MB.');
+      return;
+    }
+    setIsUploadingPhoto(true); setPhotoError(null);
+    try {
+      const signedResponse = await fetch('/api/photos/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, contentType: file.type }) });
+      const signed = await signedResponse.json();
+      if (!signedResponse.ok) throw new Error(signed.error ?? 'Não foi possível preparar a foto.');
+      const uploadResponse = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': file.type, 'x-upsert': 'false' }, body: file });
+      if (!uploadResponse.ok) throw new Error('O envio falhou. Tente novamente.');
+      setPhotoUrl(signed.publicUrl);
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Não foi possível enviar a foto.');
+    } finally { setIsUploadingPhoto(false); }
   };
 
   const toggleReplies = (postId: number) => {
@@ -203,10 +244,14 @@ export default function Forum() {
                 placeholder={`No que você está pensando, ${session.name.split(' ')[0]}?`}
                 className="forum-composer bg-black/25 border-white/10 text-base leading-relaxed focus-visible:ring-primary/50 resize-y min-h-[108px]"
               />
-              <div className="flex justify-end">
+              <input ref={photoInputRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={handlePhotoSelect} />
+              {photoUrl && <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30"><img src={photoUrl} alt="Prévia da foto a publicar" className="max-h-64 w-full object-cover" /><button type="button" onClick={() => setPhotoUrl(null)} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/65 text-white hover:bg-black"><X className="h-4 w-4" /></button></div>}
+              {photoError && <p className="text-sm text-red-200">{photoError}</p>}
+              <div className="flex items-center justify-between gap-3">
+                <Button type="button" variant="ghost" onClick={() => photoInputRef.current?.click()} disabled={isUploadingPhoto} className="text-muted-foreground hover:bg-white/5 hover:text-primary">{isUploadingPhoto ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} {isUploadingPhoto ? 'Enviando...' : 'Foto no mural'}</Button>
                 <Button 
                   type="submit" 
-                  disabled={!content.trim() || createPost.isPending}
+                  disabled={(!content.trim() && !photoUrl) || createPost.isPending || isUploadingPhoto}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 px-8"
                 >
                   {createPost.isPending ? "Publicando..." : "Publicar"}
@@ -260,9 +305,7 @@ export default function Forum() {
                         {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ptBR })}
                       </span>
                     </div>
-                    <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">
-                      {post.content}
-                    </p>
+                    {(() => { const photo = splitPhotoPost(post.content); return photo ? <div className="space-y-3"><img src={photo.url} alt={`Foto publicada por ${post.guestName}`} className="max-h-[32rem] w-full rounded-2xl border border-white/10 object-cover" />{photo.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{photo.caption}</p>}</div> : <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{post.content}</p>; })()}
                     
                     <div className="mt-4 pt-4 border-t border-white/5 flex">
                       <Button 
