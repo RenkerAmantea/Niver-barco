@@ -77,3 +77,19 @@ Fase 3 concluída. Produção limpa, perfil administrativo Renker preservado e n
 ## Estado atual
 
 Fase 4 concluída. Os aliases `renker-niver-barco` e `niver-barco` estão no mesmo deployment (`index-BOql0hc5.js` e `sw.js` v8); QA remoto confirmou `sw.js` 200 nos dois, login com senha correto 200, senha errada 401 e remoção do perfil temporário de QA.
+
+### Fase 5: Usabilidade dos convites individuais
+
+- [~] **T5.1** — Exibir o link recém-gerado inteiro em um campo acessível e permitir copiá-lo por um botão explícito.
+  - Verificação: após gerar, o URL não é truncado e o botão copia o valor com feedback de sucesso/erro.
+  - Estimativa: 10 min
+  - Depende de: nenhuma
+
+- [ ] **T5.2** — Rodar typecheck/build e inspeção visual mobile do card de convite.
+  - Verificação: painel continua responsivo em 390px; não há rolagem horizontal nem erro de console.
+  - Estimativa: 10 min
+  - Depende de: T5.1
+
+## Estado atual
+
+Fase 5 em execução: melhorar a cópia explícita do link recém-gerado no painel administrativo.
