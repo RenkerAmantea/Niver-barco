@@ -58,7 +58,10 @@ export default function Profile() {
       if (!signedResponse.ok) throw new Error(signed.error ?? 'Não foi possível preparar a imagem.');
       const uploadResponse = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'false' }, body: blob });
       if (!uploadResponse.ok) throw new Error('O envio falhou.');
-      setAvatarUrl(signed.publicUrl); URL.revokeObjectURL(crop.src); setCrop(null);
+      const profileResponse = await fetch(`/api/guests/${session.id}/profile`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() || session.name, avatarUrl: signed.publicUrl }) });
+      const guest = await profileResponse.json();
+      if (!profileResponse.ok) throw new Error(guest.error ?? 'A foto subiu, mas não conseguimos salvar o perfil.');
+      setAvatarUrl(guest.avatarUrl); saveSession({ id: guest.id, name: guest.name, avatarUrl: guest.avatarUrl }); URL.revokeObjectURL(crop.src); setCrop(null); setMessage('Foto de perfil salva. Ela já aparece no mural.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível enviar a imagem.'); }
     finally { setIsUploading(false); }
   };

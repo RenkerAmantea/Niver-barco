@@ -86,7 +86,7 @@ export default function Landing() {
               {isSubmitting ? "Entrando..." : "Entrar no Evento"} <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </form>
-          {lastSession && <button type="button" onClick={() => { resumeLastSession(); setLocation('/evento'); }} className="mt-5 text-sm text-primary transition hover:text-[#ffe29b]">Já entrou aqui? Retomar perfil de {lastSession.name}</button>}
+          {lastSession && <button type="button" onClick={() => { resumeLastSession(); setLocation('/evento'); }} className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/25 bg-primary/[.07] px-4 text-sm font-medium text-primary transition hover:bg-primary/[.13] hover:text-[#ffe29b]">Entrar como {lastSession.name}</button>}
         </CardContent>
       </Card>
 

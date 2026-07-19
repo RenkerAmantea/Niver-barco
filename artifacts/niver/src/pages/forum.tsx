@@ -243,7 +243,7 @@ export default function Forum() {
 
                 {expandedPostId === post.id && (
                   <div className="mt-2 animate-in slide-in-from-top-2 duration-300">
-                    <PostReplies postId={post.id} replyTo={post.guestName} />
+                    <PostReplies postId={post.id} />
                   </div>
                 )}
               </CardContent>
