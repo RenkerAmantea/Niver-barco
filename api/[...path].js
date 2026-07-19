@@ -4,8 +4,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-// Kept server-side; this event's short administrative code was requested by Renker.
-const ADMIN_PASSWORD = 'abc';
+const ADMIN_PASSWORD = process.env.NIVER_ADMIN_PASSWORD;
 const PHOTO_BUCKET = 'niver-barco-fotos';
 
 function rest(path, options = {}) {
