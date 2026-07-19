@@ -94,6 +94,21 @@ export default function Gallery() {
     }
   };
 
+  const openLegacyDiscussion = async () => {
+    if (!selected || !session?.id) return;
+    setMessage(null);
+    try {
+      const response = await fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, content: `[[niver-photo:${selected.url}|album]]${selected.caption ?? ''}` }) });
+      const post = await response.json();
+      if (!response.ok) throw new Error(post.error ?? 'Não foi possível abrir a conversa desta foto.');
+      const next = { ...selected, source: 'album' as const, postId: post.id };
+      setSelected(next);
+      setPhotos((current) => current.map((photo) => photo.id === selected.id ? next : photo));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível abrir a conversa desta foto.');
+    }
+  };
+
   return (
     <div className="panel-enter gallery-page pb-24">
       <section className="mb-6 flex items-end justify-between gap-4">
@@ -123,7 +138,7 @@ export default function Gallery() {
       ) : (
         <div className="gallery-empty mt-6"><Camera className="mx-auto h-10 w-10 text-primary" /><h2>O convés ainda está sem flagrantes.</h2><p>Inaugura a galeria. A primeira foto pode ser sua.</p></div>
       )}
-      {selected && <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Foto ampliada" onClick={() => setSelected(null)}><div className="relative max-h-full w-full max-w-xl overflow-auto rounded-3xl border border-white/15 bg-[#101126] p-3" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setSelected(null)} className="absolute right-5 top-5 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white"><X className="h-5 w-5" /></button><img src={selected.url} alt={`Foto enviada por ${selected.guestName}`} className="max-h-[56vh] w-full rounded-2xl object-contain" /><div className="p-3"><p className="font-display text-lg text-foreground">{selected.guestName}</p>{selected.caption && <p className="mt-1 text-sm leading-6 text-foreground/90">{selected.caption}</p>}<div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{selected.source === 'mural' ? 'Publicada pelo mural.' : 'Enviada direto ao álbum.'}</p>{selected.postId && <a href={`/forum#post-${selected.postId}`} className="shrink-0 text-sm font-medium text-primary hover:text-primary/80">Ver no mural</a>}</div>{selected.postId ? <PostReplies postId={selected.postId} /> : <p className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-3 text-sm text-muted-foreground">Foto antiga do álbum. As novas fotos já podem receber comentários aqui.</p>}</div></div></div>}
+      {selected && <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Foto ampliada" onClick={() => setSelected(null)}><div className="relative max-h-full w-full max-w-xl overflow-auto rounded-3xl border border-white/15 bg-[#101126] p-3" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setSelected(null)} className="absolute right-5 top-5 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white"><X className="h-5 w-5" /></button><img src={selected.url} alt={`Foto enviada por ${selected.guestName}`} className="max-h-[56vh] w-full rounded-2xl object-contain" /><div className="p-3"><p className="font-display text-lg text-foreground">{selected.guestName}</p>{selected.caption && <p className="mt-1 text-sm leading-6 text-foreground/90">{selected.caption}</p>}<div className="mt-2 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{selected.source === 'mural' ? 'Publicada pelo mural.' : 'Enviada direto ao álbum.'}</p>{selected.postId && <a href={`/forum#post-${selected.postId}`} className="shrink-0 text-sm font-medium text-primary hover:text-primary/80">Ver no mural</a>}</div>{selected.postId ? <PostReplies postId={selected.postId} /> : <button type="button" onClick={() => void openLegacyDiscussion()} className="mt-5 w-full rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm font-medium text-primary hover:bg-primary/20">Abrir conversa desta foto</button>}</div></div></div>}
     </div>
   );
 }
