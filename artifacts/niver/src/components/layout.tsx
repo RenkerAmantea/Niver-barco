@@ -38,8 +38,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col">
       {session && <header className="captain-bar sticky top-3 z-50 mx-auto w-[calc(100%-1.25rem)] max-w-4xl rounded-[1.15rem] border border-white/12 bg-[#0a0c1d]/72 shadow-[inset_0_1px_0_rgba(255,255,255,.11),0_18px_42px_rgba(0,0,0,.32)] backdrop-blur-2xl">
         <div className="relative mx-auto flex h-[3.85rem] items-center justify-between px-3 sm:px-4">
-          <Link href={session ? "/evento" : "/"} aria-label="Ir para o evento" className="captain-mark flex h-10 w-10 items-center justify-center text-[#f9d98a] transition-colors hover:text-[#ffe8ac]">
-            <ShipWheel className="h-[1.15rem] w-[1.15rem]" />
+          <Link href={session ? "/evento" : "/"} aria-label="Ir para o evento" className="captain-mark relative z-10 flex h-11 w-11 items-center justify-center text-[#f9d98a] transition-colors hover:text-[#ffe8ac]">
+            <ShipWheel className="h-[1.65rem] w-[1.65rem]" />
           </Link>
           <Link href={session ? "/evento" : "/"} className="absolute left-1/2 flex -translate-x-1/2 flex-col items-center whitespace-nowrap text-center leading-none transition-opacity hover:opacity-85">
             <span className="font-display text-[.7rem] font-semibold uppercase tracking-[.14em] text-[#fff0c8] sm:text-xs sm:tracking-[.18em]">Renker Niver Barco</span>
