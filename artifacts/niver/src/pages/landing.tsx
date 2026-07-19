@@ -83,20 +83,19 @@ export default function Landing() {
               placeholder="Crie ou digite sua senha"
               type="password"
               autoComplete="current-password"
-              minLength={4}
               className="premium-input h-14 border-white/15 bg-black/35 text-center text-lg placeholder:text-white/35 focus-visible:border-[#ffd782]/60 focus-visible:ring-[#ffd782]/30"
               disabled={isSubmitting}
             />
             <Button 
               type="submit" 
               size="lg" 
-              disabled={!name.trim() || password.length < 4 || isSubmitting}
+              disabled={!name.trim() || isSubmitting}
               className="premium-cta shimmer h-14 w-full border border-[#fff0b4]/70 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] text-lg font-bold text-[#150d05] opacity-100 transition-all hover:from-[#fff1bc] hover:via-[#f7cc69] hover:to-[#df9132]"
             >
               {isSubmitting ? "Entrando..." : "Entrar no Evento"} <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </form>
-          <p className="mt-3 text-center text-xs leading-5 text-white/42">Primeira vez? Este nome e senha criam seu perfil. Já entrou? Use o mesmo par para voltar ao mesmo perfil.</p>
+          <p className="mt-3 text-center text-xs leading-5 text-white/42">Primeira vez? Este nome e senha criam seu perfil. Já entrou? Use o mesmo par para voltar ao mesmo perfil. A senha precisa ter pelo menos 4 caracteres.</p>
           {entryError && <p role="alert" className="mt-4 rounded-xl border border-red-300/25 bg-red-500/10 px-3 py-2 text-center text-sm text-red-100">{entryError}</p>}
           {deviceSessions.length > 0 && <div className="mt-6 w-full border-t border-white/10 pt-5">
             <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-[.18em] text-white/45">Perfis neste aparelho</p>

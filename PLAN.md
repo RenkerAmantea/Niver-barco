@@ -93,3 +93,24 @@ Fase 4 concluída. Os aliases `renker-niver-barco` e `niver-barco` estão no mes
 ## Estado atual
 
 Fase 5 concluída. O painel agora preserva o URL completo em campo selecionável, com ação explícita de cópia e feedback. Typecheck/build do app passaram; QA em produção confirmou o painel administrativo em viewport 390px, sem erros de console. Os dois aliases foram conferidos com cache-buster e retornam o mesmo bundle `index-BuW1lMCr.js`.
+
+### Fase 6: Regressão de entrada e avatar
+
+- [~] **T6.1** — Corrigir a criação por convite para persistir um avatar náutico aleatório, no mesmo conjunto usado pelo login normal.
+  - Verificação: convite novo retorna e salva `avatarUrl` não vazio; abrir o link mostra o avatar no perfil e no mural.
+  - Estimativa: 15 min
+  - Depende de: nenhuma
+
+- [ ] **T6.2** — Investigar e corrigir o bloqueio do CTA “Entrar no Evento” no fluxo nome + senha.
+  - Verificação: em uma sessão limpa, nome e senha válidos habilitam o CTA e concluem o login/criação.
+  - Estimativa: 20 min
+  - Depende de: nenhuma
+
+- [ ] **T6.3** — Validar ambos os fluxos em produção e publicar apenas após o QA.
+  - Verificação: build/typecheck do app, screenshot mobile e chamadas reais passam; dados temporários de QA são removidos.
+  - Estimativa: 15 min
+  - Depende de: T6.1, T6.2
+
+## Estado atual
+
+Fase 6 em execução: corrigir regressões reportadas no avatar de convite individual e no CTA de entrada.

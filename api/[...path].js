@@ -272,6 +272,29 @@ function normalizedName(name) {
   return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+// Fallback server-side for every creation path. The regular login sends one of
+// the richer client-side options, but invitations and direct API calls must
+// never leave a guest with an empty visual identity.
+const DEFAULT_AVATARS = [
+  { background: '#40215f', accent: '#f8cc6d', shape: '<path d="M48 20l5.5 18 18.5-5.5-13 13L72 58l-18.5-1L48 76l-5.5-19L24 58l13-12.5-13-13 18.5 5.5z" fill="ACCENT"/>' },
+  { background: '#123d65', accent: '#7fe5ff', shape: '<path d="M20 51c9-12 17 12 28 0s19 12 28 0M20 63c9-12 17 12 28 0s19 12 28 0" fill="none" stroke="ACCENT" stroke-width="5" stroke-linecap="round"/>' },
+  { background: '#54224f', accent: '#ff9bd2', shape: '<path d="M61 24a25 25 0 1 0 11 43A28 28 0 1 1 61 24z" fill="ACCENT"/>' },
+  { background: '#19524e', accent: '#93f5d2', shape: '<path d="M48 18l10 30-10 30-10-30z" fill="ACCENT"/><path d="M18 48l30-10 30 10-30 10z" fill="ACCENT" opacity=".7"/>' },
+  { background: '#693a15', accent: '#ffe08a', shape: '<circle cx="48" cy="48" r="16" fill="ACCENT"/><path d="M48 20v9m0 38v9M20 48h9m38 0h9M28 28l6 6m28 28 6 6m0-40-6 6M34 62l-6 6" stroke="ACCENT" stroke-width="4" stroke-linecap="round"/>' },
+  { background: '#34345d', accent: '#d7d4ff', shape: '<path d="M48 18v59M48 23l27 42H48zM44 32L20 65h24zM16 78h64" fill="none" stroke="ACCENT" stroke-width="4" stroke-linejoin="round"/>' },
+  { background: '#233b5c', accent: '#cfdef3', shape: '<path d="M48 18v42m-9-31h18m-30 31c0 14 9 20 21 20s21-6 21-20M24 60h48" fill="none" stroke="ACCENT" stroke-width="5" stroke-linecap="round"/><circle cx="48" cy="17" r="5" fill="ACCENT"/>' },
+  { background: '#30275a', accent: '#a9d7ff', shape: '<circle cx="48" cy="48" r="9" fill="ACCENT"/><ellipse cx="48" cy="48" rx="29" ry="12" fill="none" stroke="ACCENT" stroke-width="3.5"/><ellipse cx="48" cy="48" rx="12" ry="29" fill="none" stroke="ACCENT" stroke-width="3.5"/>' },
+];
+
+function defaultAvatarUrl(seed) {
+  const source = String(seed || 'convidado');
+  const index = [...source].reduce((total, char) => total + char.charCodeAt(0), 0) % DEFAULT_AVATARS.length;
+  const avatar = DEFAULT_AVATARS[index];
+  const shape = avatar.shape.replaceAll('ACCENT', avatar.accent);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${avatar.background}"/><stop offset="1" stop-color="#100d2c"/></linearGradient></defs><rect width="96" height="96" rx="48" fill="url(#g)"/><circle cx="48" cy="48" r="30" fill="none" stroke="${avatar.accent}" stroke-width="2" opacity=".45"/>${shape}</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 function rsvpNotes(posts) {
   const notes = new Map();
   for (const post of posts ?? []) {
@@ -427,7 +450,7 @@ export default async function handler(req, res) {
         const namesResponse = await rest('niver_barco_guests?select=id,name'); const names = await readJson(namesResponse);
         if (!namesResponse.ok) return res.status(namesResponse.status).json(names);
         if ((names ?? []).some((guest) => normalizedName(guest.name) === normalizedName(name))) return res.status(409).json({ error: 'Esse nome já está reservado ou em uso.' });
-        const guestResponse = await rest('niver_barco_guests', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, rsvp_status: 'pending' }) });
+        const guestResponse = await rest('niver_barco_guests', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, avatar_url: defaultAvatarUrl(name), rsvp_status: 'pending' }) });
         const createdGuests = await readJson(guestResponse); const guest = createdGuests?.[0];
         if (!guestResponse.ok || !guest) return res.status(guestResponse.status).json(createdGuests);
         const token = `${inviteSlug(name)}-${randomBytes(24).toString('base64url')}`;
@@ -461,8 +484,15 @@ export default async function handler(req, res) {
         const claimResponse = await rest(`niver_barco_posts?id=eq.${marker.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ content }) });
         if (!claimResponse.ok) return res.status(claimResponse.status).json(await readJson(claimResponse));
       }
+      let invitedGuest = guests[0];
+      if (!invitedGuest.avatar_url) {
+        const avatar_url = defaultAvatarUrl(invitedGuest.name);
+        const avatarResponse = await rest(`niver_barco_guests?id=eq.${invitedGuest.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ avatar_url }) });
+        const updated = await readJson(avatarResponse);
+        if (avatarResponse.ok && updated?.[0]) invitedGuest = updated[0];
+      }
       const adminMarkerResponse = await rest(`niver_barco_posts?select=content&guest_id=eq.${marker.guest_id}`); const guestMarkers = await readJson(adminMarkerResponse);
-      return res.status(200).json({ ...guestResponse(guests[0]), isAdmin: (guestMarkers ?? []).some((item) => adminMarkerFromContent(item.content)) });
+      return res.status(200).json({ ...guestResponse(invitedGuest), isAdmin: (guestMarkers ?? []).some((item) => adminMarkerFromContent(item.content)) });
     }
 
 
@@ -676,7 +706,7 @@ export default async function handler(req, res) {
         if (!passwordMatches(password, record)) return res.status(401).json({ error: 'Nome ou senha não conferem.' });
         return res.status(200).json(guestResponse(guest));
       }
-      const avatarUrl = typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl : null;
+      const avatarUrl = typeof req.body?.avatarUrl === 'string' && req.body.avatarUrl ? req.body.avatarUrl : defaultAvatarUrl(name);
       const createResponse = await rest('niver_barco_guests', {
         method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, avatar_url: avatarUrl, rsvp_status: 'pending' }),
       });
@@ -704,7 +734,7 @@ export default async function handler(req, res) {
       const response = await rest('niver_barco_guests', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({ name, avatar_url: typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl : null, rsvp_status: req.body?.rsvpStatus ?? 'pending' }),
+        body: JSON.stringify({ name, avatar_url: typeof req.body?.avatarUrl === 'string' && req.body.avatarUrl ? req.body.avatarUrl : defaultAvatarUrl(name), rsvp_status: req.body?.rsvpStatus ?? 'pending' }),
       });
       const guests = await readJson(response);
       return res.status(response.status).json(guestResponse(guests[0]));
