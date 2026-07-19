@@ -621,6 +621,7 @@ export default async function handler(req, res) {
       const guestId = Number(req.body?.guestId);
       const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
       if (!Number.isInteger(guestId) || !content) return res.status(400).json({ error: 'Dados inválidos' });
+      if (/^\[\[niver-(admin|invite|payment|payment-settings|payment-reminder-dismissed)\]\]/.test(content)) return res.status(403).json({ error: 'Marcador reservado.' });
       const response = await rest('niver_barco_posts', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
