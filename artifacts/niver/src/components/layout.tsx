@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useState } from 'react';
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
-import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Shield } from "lucide-react";
+import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Shield, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { PresenceCard } from './presence-card';
 import { PwaControls } from './pwa-controls';
@@ -24,6 +24,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => {
     clearSession();
     setLocation("/");
+  };
+  const dismissPushNudge = () => {
+    sessionStorage.setItem('niver_push_nudge_seen', '1');
+    setShowPushNudge(false);
   };
 
   const navLinks = [
@@ -65,7 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {navLinks.map(({ href, label, icon: Icon, featured }) => <Link key={href} href={href} aria-current={location === href ? 'page' : undefined} className={cn('bottom-nav-item', featured && 'bottom-nav-item-center')}><Icon className="bottom-nav-icon" /> <span className="bottom-nav-label">{label}</span></Link>)}
       </nav>}
       <PwaControls />
-      {showPushNudge && <div className="fixed inset-0 z-[75] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md space-y-3"><PushControls /><button type="button" onClick={() => { sessionStorage.setItem('niver_push_nudge_seen', '1'); setShowPushNudge(false); }} className="mx-auto block px-4 py-2 text-sm text-white/60">Agora não</button></div></div>}
+      {showPushNudge && <div className="fixed inset-0 z-[75] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div role="dialog" aria-modal="true" aria-label="Configurar avisos do barco" className="relative w-full max-w-md space-y-3"><button type="button" onClick={dismissPushNudge} aria-label="Fechar avisos" className="absolute -right-1 -top-1 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/12 bg-[#101126]/95 text-white/60 shadow-lg transition hover:border-primary/35 hover:text-primary"><X className="h-4 w-4" /></button><PushControls /><button type="button" onClick={dismissPushNudge} className="premium-cta shimmer mx-auto flex min-h-11 items-center justify-center rounded-xl border border-[#fff0b4]/60 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] px-8 text-sm font-semibold text-[#150d05]">Pronto</button></div></div>}
       {session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados' && <div className="fixed inset-0 z-[70] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md"><PresenceCard /></div></div>}
     </div>
   );
