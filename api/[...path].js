@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -96,6 +96,32 @@ function pushSubscriptionFromContent(content) {
   try { return JSON.parse(match[1]); } catch { return null; }
 }
 
+function passwordFromContent(content) {
+  const match = typeof content === 'string' && content.match(/^\[\[niver-password\]\](.+)$/s);
+  if (!match) return null;
+  try {
+    const password = JSON.parse(match[1]);
+    if (!password?.salt || !password?.hash) return null;
+    return { salt: String(password.salt), hash: String(password.hash) };
+  } catch { return null; }
+}
+
+function validPassword(password) {
+  return typeof password === 'string' && password.length >= 4 && password.length <= 72;
+}
+
+function passwordRecord(password) {
+  const salt = randomBytes(16).toString('base64url');
+  return { salt, hash: scryptSync(password, salt, 32).toString('base64url') };
+}
+
+function passwordMatches(password, record) {
+  if (!validPassword(password) || !record) return false;
+  const expected = Buffer.from(record.hash, 'base64url');
+  const actual = scryptSync(password, record.salt, 32);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
 function notificationFromContent(content) {
   const match = typeof content === 'string' && content.match(/^\[\[niver-notification\]\](.+)$/s);
   if (!match) return null;
@@ -164,7 +190,7 @@ function unclaimedInviteGuestIds(posts) {
 }
 
 function isPrivateMarker(content) {
-  return noteFromContent(content) !== null || replyReactionFromContent(content) !== null || pushSubscriptionFromContent(content) !== null || notificationFromContent(content) !== null || inviteFromContent(content) !== null || adminMarkerFromContent(content) || paymentFromContent(content) !== null || paymentSettingsFromContent(content) !== null || paymentDismissedFromContent(content);
+  return noteFromContent(content) !== null || replyReactionFromContent(content) !== null || pushSubscriptionFromContent(content) !== null || passwordFromContent(content) !== null || notificationFromContent(content) !== null || inviteFromContent(content) !== null || adminMarkerFromContent(content) || paymentFromContent(content) !== null || paymentSettingsFromContent(content) !== null || paymentDismissedFromContent(content);
 }
 
 function admin(req) {
@@ -605,6 +631,46 @@ export default async function handler(req, res) {
       if (!notesResponse.ok) return res.status(notesResponse.status).json(posts);
       const notes = rsvpNotes(posts); const hiddenGuestIds = unclaimedInviteGuestIds(posts);
       return res.status(response.status).json(Array.isArray(guests) ? guests.filter((guest) => !hiddenGuestIds.has(guest.id)).map((guest) => guestResponse(guest, notes)) : guests);
+    }
+
+    // A senha é uma credencial de recuperação, não um atributo público do
+    // perfil. Ela permite que alguém criado no navegador entre no mesmo
+    // perfil depois de instalar o PWA (ou trocar de aparelho), sem depender
+    // do localStorage daquele navegador.
+    if (req.method === 'POST' && path === '/auth/access') {
+      const name = typeof req.body?.name === 'string' ? req.body.name.trim().replace(/\s+/g, ' ') : '';
+      const password = req.body?.password;
+      if (!name || name.length > 80) return res.status(400).json({ error: 'Digite seu nome para entrar.' });
+      if (!validPassword(password)) return res.status(400).json({ error: 'Crie uma senha de pelo menos 4 caracteres.' });
+      const existingResponse = await rest('niver_barco_guests?select=*&order=created_at.asc');
+      const existing = await readJson(existingResponse);
+      if (!existingResponse.ok) return res.status(existingResponse.status).json(existing);
+      const guest = (existing ?? []).find((item) => normalizedName(item.name) === normalizedName(name));
+      if (guest) {
+        const markersResponse = await rest(`niver_barco_posts?select=content&guest_id=eq.${guest.id}`);
+        const markers = await readJson(markersResponse);
+        if (!markersResponse.ok) return res.status(markersResponse.status).json(markers);
+        const record = (markers ?? []).map((marker) => passwordFromContent(marker.content)).find(Boolean);
+        if (!record) return res.status(409).json({ error: 'Este perfil foi criado antes do acesso com senha. Entre pelo atalho “Entrar como” deste aparelho para não perder o perfil.' });
+        if (!passwordMatches(password, record)) return res.status(401).json({ error: 'Nome ou senha não conferem.' });
+        return res.status(200).json(guestResponse(guest));
+      }
+      const avatarUrl = typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl : null;
+      const createResponse = await rest('niver_barco_guests', {
+        method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, avatar_url: avatarUrl, rsvp_status: 'pending' }),
+      });
+      const created = await readJson(createResponse);
+      const createdGuest = created?.[0];
+      if (!createResponse.ok || !createdGuest) return res.status(createResponse.status).json(created);
+      const record = passwordRecord(password);
+      const passwordResponse = await rest('niver_barco_posts', {
+        method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: createdGuest.id, content: `[[niver-password]]${JSON.stringify(record)}` }),
+      });
+      if (!passwordResponse.ok) {
+        await rest(`niver_barco_guests?id=eq.${createdGuest.id}`, { method: 'DELETE' });
+        return res.status(500).json({ error: 'Não foi possível preparar o acesso deste perfil. Tente de novo.' });
+      }
+      return res.status(201).json(guestResponse(createdGuest));
     }
 
     if (req.method === 'POST' && path === '/guests') {

@@ -62,3 +62,18 @@ Perfis locais concluídos. Nova fase em andamento.
 ## Estado final
 
 Fase 3 concluída. Produção limpa, perfil administrativo Renker preservado e novo endereço público validado.
+
+### Fase 4: Recuperação entre navegador e PWA
+
+- [x] **T4.1** — Garantir que o service worker seja sempre publicado e que a ativação de push recupere de uma instalação antiga que recebeu `sw.js` 404.
+  - Verificação: `GET /sw.js` responde JavaScript 200 no domínio canônico; registro testa o arquivo antes de tentar ativar push.
+- [x] **T4.2** — Criar autenticação leve por nome + senha, armazenando somente hash com salt no backend.
+  - Verificação: perfil novo exige senha; mesmo nome + senha entra no mesmo ID em uma sessão limpa; senha incorreta não revela nem cria outro perfil.
+- [x] **T4.3** — Manter atalhos de perfis do aparelho como conveniência e adequar a tela de entrada.
+  - Verificação: atalhos continuam funcionando, criação/login têm mensagens claras e o layout móvel não corta controles.
+- [x] **T4.4** — QA de regressão e publicação única nos dois aliases.
+  - Verificação: build/typecheck, chamadas de auth, `sw.js` e produção passam.
+
+## Estado atual
+
+Fase 4 concluída. Os aliases `renker-niver-barco` e `niver-barco` estão no mesmo deployment (`index-BOql0hc5.js` e `sw.js` v8); QA remoto confirmou `sw.js` 200 nos dois, login com senha correto 200, senha errada 401 e remoção do perfil temporário de QA.

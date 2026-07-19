@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
-import { useCreateGuest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,10 +11,9 @@ export default function Landing() {
   const { session, deviceSessions, saveSession, forgetDeviceSession } = useSession();
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [entryError, setEntryError] = useState<string | null>(null);
-
-  const createGuest = useCreateGuest();
 
   useEffect(() => {
     if (session) {
@@ -32,21 +30,21 @@ export default function Landing() {
     setIsSubmitting(true);
     setEntryError(null);
     try {
-      createGuest.mutate(
-      { data: { name: name.trim(), avatarUrl: makeAvatar(avatarOptions[Math.floor(Math.random() * avatarOptions.length)].id, avatarAccents[Math.floor(Math.random() * avatarAccents.length)].id) } },
-        {
-          onSuccess: (guest) => {
-            saveSession({ id: guest.id, name: guest.name, avatarUrl: guest.avatarUrl });
-            setLocation("/convidados");
-          },
-          onSettled: () => {
-            setIsSubmitting(false);
-          },
-          onError: (error: Error) => setEntryError(error.message || 'Não foi possível entrar agora.')
-        }
-      );
+      const response = await fetch('/api/auth/access', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          password,
+          avatarUrl: makeAvatar(avatarOptions[Math.floor(Math.random() * avatarOptions.length)].id, avatarAccents[Math.floor(Math.random() * avatarAccents.length)].id),
+        }),
+      });
+      const guest = await response.json();
+      if (!response.ok) throw new Error(guest?.error || 'Não foi possível entrar agora.');
+      saveSession({ id: guest.id, name: guest.name, avatarUrl: guest.avatarUrl });
+      setLocation('/convidados');
     } catch (error) {
-      console.error(error);
+      setEntryError(error instanceof Error ? error.message : 'Não foi possível entrar agora.');
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -70,7 +68,7 @@ export default function Landing() {
         <CardContent className="relative z-10 p-8 pt-8 flex flex-col items-center">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.22em] text-[#ffd782]">embarque confirmado</p>
           <h2 className="mb-2 text-center text-2xl font-display font-semibold text-foreground">Como te chamamos?</h2>
-          <p className="mb-6 text-center text-sm text-muted-foreground">Entre para confirmar presença e ver a tripulação.</p>
+          <p className="mb-6 text-center text-sm text-muted-foreground">Entre para confirmar presença e ver a tripulação. A senha permite reencontrar seu perfil no app ou em outro aparelho.</p>
           <form onSubmit={handleEnter} className="w-full space-y-4 flex flex-col items-center">
             <Input
               value={name}
@@ -79,15 +77,26 @@ export default function Landing() {
               className="premium-input h-14 border-white/15 bg-black/35 text-center text-lg placeholder:text-white/35 focus-visible:border-[#ffd782]/60 focus-visible:ring-[#ffd782]/30"
               disabled={isSubmitting}
             />
+            <Input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Crie ou digite sua senha"
+              type="password"
+              autoComplete="current-password"
+              minLength={4}
+              className="premium-input h-14 border-white/15 bg-black/35 text-center text-lg placeholder:text-white/35 focus-visible:border-[#ffd782]/60 focus-visible:ring-[#ffd782]/30"
+              disabled={isSubmitting}
+            />
             <Button 
               type="submit" 
               size="lg" 
-              disabled={!name.trim() || isSubmitting}
+              disabled={!name.trim() || password.length < 4 || isSubmitting}
               className="premium-cta shimmer h-14 w-full border border-[#fff0b4]/70 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] text-lg font-bold text-[#150d05] opacity-100 transition-all hover:from-[#fff1bc] hover:via-[#f7cc69] hover:to-[#df9132]"
             >
               {isSubmitting ? "Entrando..." : "Entrar no Evento"} <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </form>
+          <p className="mt-3 text-center text-xs leading-5 text-white/42">Primeira vez? Este nome e senha criam seu perfil. Já entrou? Use o mesmo par para voltar ao mesmo perfil.</p>
           {entryError && <p role="alert" className="mt-4 rounded-xl border border-red-300/25 bg-red-500/10 px-3 py-2 text-center text-sm text-red-100">{entryError}</p>}
           {deviceSessions.length > 0 && <div className="mt-6 w-full border-t border-white/10 pt-5">
             <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-[.18em] text-white/45">Perfis neste aparelho</p>

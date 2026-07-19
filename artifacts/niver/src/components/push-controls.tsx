@@ -20,6 +20,22 @@ function sameApplicationServerKey(subscription: PushSubscription, publicKey: str
   return current.length === expected.length && current.every((value, index) => value === expected[index]);
 }
 
+async function getVerifiedServiceWorker() {
+  // Um deploy incompleto chegou a deixar um PWA antigo procurando `sw.js` e
+  // recebendo 404. Conferir o arquivo antes do registro troca um erro técnico
+  // críptico por uma recuperação previsível e impede assinar push em worker
+  // quebrado/cacheado.
+  const workerResponse = await fetch('/sw.js', { cache: 'no-store' });
+  const contentType = workerResponse.headers.get('content-type') || '';
+  if (!workerResponse.ok || !contentType.includes('javascript')) {
+    throw new Error('A atualização do app ainda está sendo aplicada. Feche e abra o app, aguarde um minuto e tente novamente.');
+  }
+  const registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
+  await registration.update();
+  if (registration.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  return navigator.serviceWorker.ready;
+}
+
 export function PushControls() {
   const { session } = useSession();
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
@@ -42,7 +58,7 @@ export function PushControls() {
         if (active) { setSubscribed(false); setChecking(false); }
         return;
       }
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await getVerifiedServiceWorker();
       const subscription = await registration.pushManager.getSubscription();
       if (active) { setSubscribed(Boolean(subscription)); setChecking(false); }
     };
@@ -61,7 +77,7 @@ export function PushControls() {
       const nextPermission = await Notification.requestPermission();
       setPermission(nextPermission);
       if (nextPermission !== 'granted') { setSubscribed(false); setMessage('Você pode ativar depois nas permissões do navegador.'); return; }
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await getVerifiedServiceWorker();
       const previousSubscription = await registration.pushManager.getSubscription();
       const options = { userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) };
       let subscription: PushSubscription;
@@ -80,9 +96,8 @@ export function PushControls() {
         const message = firstError instanceof Error ? firstError.message : '';
         if (!/push service|registration failed|abort/i.test(message)) throw firstError;
         await registration.unregister();
-        const freshRegistration = await navigator.serviceWorker.register('/sw.js');
-        await freshRegistration.update();
-        const activeRegistration = await navigator.serviceWorker.ready;
+        const freshRegistration = await getVerifiedServiceWorker();
+        const activeRegistration = freshRegistration;
           subscription = await activeRegistration.pushManager.subscribe(options);
         }
       }
