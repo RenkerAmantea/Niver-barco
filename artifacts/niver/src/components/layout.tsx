@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
-import { LogOut, ShipWheel, CalendarDays, UsersRound, MessageCircle, Images, UserRound, Waves } from "lucide-react";
+import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Waves } from "lucide-react";
 import { Button } from "./ui/button";
 import { PresenceCard } from './presence-card';
 import { useGetGuest, GuestRsvpStatus, getGetGuestQueryKey } from '@workspace/api-client-react';
@@ -19,7 +19,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navLinks = [
     { href: "/evento", label: "Evento", icon: CalendarDays },
     { href: "/convidados", label: "Convidados", icon: UsersRound },
-    { href: "/forum", label: "Mural", icon: MessageCircle, featured: true },
+    { href: "/forum", label: "Mural", icon: MessagesSquare, featured: true },
     { href: "/fotos", label: "Fotos", icon: Images },
     { href: "/perfil", label: "Perfil", icon: UserRound },
   ];
@@ -49,11 +49,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       
-      <footer className="border-t border-white/5 py-8 pb-24 text-center text-sm text-muted-foreground">
+      <footer className="border-t border-white/5 py-8 pb-28 text-center text-sm text-muted-foreground">
         <p>Renker de Bolso, porque nem todo aniversário precisa de uma operação logística de médio porte.</p>
       </footer>
-      {session && <nav aria-label="Navegação principal" className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-lg items-center justify-around rounded-2xl border border-white/12 bg-[#090b1c]/84 px-1 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,.07),0_14px_32px_rgba(0,0,0,.36)] backdrop-blur-xl">
-        {navLinks.map(({ href, label, icon: Icon, featured }) => <Link key={href} href={href} className={cn("flex min-w-0 cursor-pointer flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] transition-all sm:min-w-15 sm:px-3 sm:text-[10px]", featured && 'min-w-14 border border-primary/25 bg-primary/12 text-primary', location === href ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")}><Icon className={cn('h-4 w-4', featured && 'h-[1.1rem] w-[1.1rem]')} />{label}</Link>)}
+      {session && <nav aria-label="Navegação principal" className="bottom-nav fixed inset-x-3 bottom-3 z-50 mx-auto max-w-lg">
+        {navLinks.map(({ href, label, icon: Icon, featured }) => <Link key={href} href={href} aria-current={location === href ? 'page' : undefined} className={cn('bottom-nav-item', featured && 'bottom-nav-item-center')}><Icon className="bottom-nav-icon" /> <span className="bottom-nav-label">{label}</span></Link>)}
       </nav>}
       {session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados' && <div className="fixed inset-0 z-[70] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md"><PresenceCard /></div></div>}
     </div>
