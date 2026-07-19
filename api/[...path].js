@@ -1,4 +1,5 @@
 import webpush from 'web-push';
+import { createHash, randomBytes } from 'node:crypto';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -94,8 +95,44 @@ function notificationFromContent(content) {
   } catch { return null; }
 }
 
+function inviteFromContent(content) {
+  const match = typeof content === 'string' && content.match(/^\[\[niver-invite\]\](.+)$/s);
+  if (!match) return null;
+  try {
+    const invite = JSON.parse(match[1]);
+    if (!invite?.tokenHash || !invite?.slug) return null;
+    return {
+      tokenHash: String(invite.tokenHash),
+      slug: String(invite.slug),
+      createdAt: typeof invite.createdAt === 'string' ? invite.createdAt : null,
+      claimedAt: typeof invite.claimedAt === 'string' ? invite.claimedAt : null,
+    };
+  } catch { return null; }
+}
+
+function tokenHash(token) {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function inviteSlug(name) {
+  const result = normalizedName(name)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    .slice(0, 42);
+  return result || 'convidado';
+}
+
+function unclaimedInviteGuestIds(posts) {
+  const ids = new Set();
+  for (const post of posts ?? []) {
+    const invite = inviteFromContent(post.content);
+    if (invite && !invite.claimedAt) ids.add(post.guest_id);
+  }
+  return ids;
+}
+
 function isPrivateMarker(content) {
-  return noteFromContent(content) !== null || replyReactionFromContent(content) !== null || pushSubscriptionFromContent(content) !== null || notificationFromContent(content) !== null;
+  return noteFromContent(content) !== null || replyReactionFromContent(content) !== null || pushSubscriptionFromContent(content) !== null || notificationFromContent(content) !== null || inviteFromContent(content) !== null;
 }
 
 function admin(req) {
@@ -276,6 +313,66 @@ export default async function handler(req, res) {
       return res.status(200).json({ ...outcome, saved, subscribedDevices: records.length });
     }
 
+    if (path === '/admin/invites') {
+      if (!admin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      if (req.method === 'GET') {
+        const [guestsResponse, markersResponse] = await Promise.all([
+          rest('niver_barco_guests?select=id,name,created_at,rsvp_status&order=created_at.desc'),
+          rest('niver_barco_posts?select=id,guest_id,content&order=created_at.desc'),
+        ]);
+        const [guests, markers] = await Promise.all([readJson(guestsResponse), readJson(markersResponse)]);
+        if (!guestsResponse.ok) return res.status(guestsResponse.status).json(guests);
+        if (!markersResponse.ok) return res.status(markersResponse.status).json(markers);
+        const byGuest = new Map((guests ?? []).map((guest) => [guest.id, guest]));
+        const invites = (markers ?? []).flatMap((marker) => {
+          const invite = inviteFromContent(marker.content); const guest = byGuest.get(marker.guest_id);
+          return invite && guest ? [{ id: marker.id, guestId: guest.id, name: guest.name, slug: invite.slug, createdAt: invite.createdAt, claimedAt: invite.claimedAt, rsvpStatus: guest.rsvp_status }] : [];
+        });
+        return res.status(200).json(invites);
+      }
+      if (req.method === 'POST') {
+        const name = typeof req.body?.name === 'string' ? req.body.name.trim().replace(/\s+/g, ' ') : '';
+        if (!name || name.length > 80) return res.status(400).json({ error: 'Nome inválido.' });
+        const namesResponse = await rest('niver_barco_guests?select=id,name'); const names = await readJson(namesResponse);
+        if (!namesResponse.ok) return res.status(namesResponse.status).json(names);
+        if ((names ?? []).some((guest) => normalizedName(guest.name) === normalizedName(name))) return res.status(409).json({ error: 'Esse nome já está reservado ou em uso.' });
+        const guestResponse = await rest('niver_barco_guests', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, rsvp_status: 'pending' }) });
+        const createdGuests = await readJson(guestResponse); const guest = createdGuests?.[0];
+        if (!guestResponse.ok || !guest) return res.status(guestResponse.status).json(createdGuests);
+        const token = `${inviteSlug(name)}-${randomBytes(24).toString('base64url')}`;
+        const invite = { tokenHash: tokenHash(token), slug: inviteSlug(name), createdAt: new Date().toISOString(), claimedAt: null };
+        const markerResponse = await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ guest_id: guest.id, content: `[[niver-invite]]${JSON.stringify(invite)}` }) });
+        const markers = await readJson(markerResponse);
+        if (!markerResponse.ok) {
+          await rest(`niver_barco_guests?id=eq.${guest.id}`, { method: 'DELETE' });
+          return res.status(markerResponse.status).json(markers);
+        }
+        const origin = req.headers.origin || 'https://niver-barco.vercel.app';
+        return res.status(201).json({ id: markers?.[0]?.id, guestId: guest.id, name: guest.name, slug: invite.slug, url: `${origin}/i/${token}`, createdAt: invite.createdAt, claimedAt: null });
+      }
+      return res.status(405).end();
+    }
+
+    const inviteMatch = path.match(/^\/invites\/([^/]+)$/);
+    if (inviteMatch && req.method === 'GET') {
+      const token = decodeURIComponent(inviteMatch[1]);
+      if (token.length < 36) return res.status(404).json({ error: 'Convite não encontrado.' });
+      const markersResponse = await rest('niver_barco_posts?select=id,guest_id,content'); const markers = await readJson(markersResponse);
+      if (!markersResponse.ok) return res.status(markersResponse.status).json(markers);
+      const marker = (markers ?? []).find((item) => inviteFromContent(item.content)?.tokenHash === tokenHash(token));
+      const invite = marker && inviteFromContent(marker.content);
+      if (!marker || !invite) return res.status(404).json({ error: 'Convite não encontrado.' });
+      const invitedGuestResponse = await rest(`niver_barco_guests?select=*&id=eq.${marker.guest_id}`); const guests = await readJson(invitedGuestResponse);
+      if (!invitedGuestResponse.ok || !guests?.[0]) return res.status(404).json({ error: 'Convidado não encontrado.' });
+      if (!invite.claimedAt) {
+        const claimedAt = new Date().toISOString();
+        const content = `[[niver-invite]]${JSON.stringify({ ...invite, claimedAt })}`;
+        const claimResponse = await rest(`niver_barco_posts?id=eq.${marker.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ content }) });
+        if (!claimResponse.ok) return res.status(claimResponse.status).json(await readJson(claimResponse));
+      }
+      return res.status(200).json(guestResponse(guests[0]));
+    }
+
     if (req.method === 'GET' && path === '/photos') {
       await ensurePhotoBucket();
       const guestsResponse = await rest('niver_barco_guests?select=id,name,avatar_url');
@@ -358,8 +455,8 @@ export default async function handler(req, res) {
       const [response, notesResponse] = await Promise.all([rest('niver_barco_guests?select=*&order=created_at.asc'), rest('niver_barco_posts?select=guest_id,content,created_at&order=created_at.asc')]);
       const [guests, posts] = await Promise.all([readJson(response), readJson(notesResponse)]);
       if (!notesResponse.ok) return res.status(notesResponse.status).json(posts);
-      const notes = rsvpNotes(posts);
-      return res.status(response.status).json(Array.isArray(guests) ? guests.map((guest) => guestResponse(guest, notes)) : guests);
+      const notes = rsvpNotes(posts); const hiddenGuestIds = unclaimedInviteGuestIds(posts);
+      return res.status(response.status).json(Array.isArray(guests) ? guests.filter((guest) => !hiddenGuestIds.has(guest.id)).map((guest) => guestResponse(guest, notes)) : guests);
     }
 
     if (req.method === 'POST' && path === '/guests') {
@@ -424,10 +521,12 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET' && path === '/stats/rsvp-summary') {
-      const response = await rest('niver_barco_guests?select=rsvp_status');
-      const guests = await readJson(response);
+      const [response, markersResponse] = await Promise.all([rest('niver_barco_guests?select=id,rsvp_status'), rest('niver_barco_posts?select=guest_id,content')]);
+      const [guests, markers] = await Promise.all([readJson(response), readJson(markersResponse)]);
+      if (!markersResponse.ok) return res.status(markersResponse.status).json(markers);
+      const hiddenGuestIds = unclaimedInviteGuestIds(markers);
       const summary = { going: 0, maybe: 0, notGoing: 0, pending: 0 };
-      for (const guest of guests) {
+      for (const guest of guests.filter((item) => !hiddenGuestIds.has(item.id))) {
         if (guest.rsvp_status === 'not_going') summary.notGoing += 1;
         else if (guest.rsvp_status in summary) summary[guest.rsvp_status] += 1;
       }

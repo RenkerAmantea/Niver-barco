@@ -12,6 +12,7 @@ import Event from '@/pages/event';
 import Gallery from '@/pages/gallery';
 import Profile from '@/pages/profile';
 import Admin from '@/pages/admin';
+import Invite from '@/pages/invite';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ function Router() {
         <Route path="/fotos" component={Gallery} />
         <Route path="/perfil" component={Profile} />
         <Route path="/admin" component={Admin} />
+        <Route path="/i/:token" component={Invite} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
