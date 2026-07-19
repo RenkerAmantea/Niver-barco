@@ -6,24 +6,41 @@ export interface GuestSession {
   avatarUrl?: string | null;
 }
 
+const SESSION_KEY = 'niver_session';
+const SESSION_EVENT = 'niver-session-changed';
+
+function readSession(): GuestSession | null {
+  try {
+    const saved = localStorage.getItem(SESSION_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useSession() {
-  const [session, setSessionState] = useState<GuestSession | null>(() => {
-    try {
-      const saved = localStorage.getItem('niver_session');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [session, setSessionState] = useState<GuestSession | null>(readSession);
+
+  useEffect(() => {
+    const syncSession = () => setSessionState(readSession());
+    window.addEventListener('storage', syncSession);
+    window.addEventListener(SESSION_EVENT, syncSession);
+    return () => {
+      window.removeEventListener('storage', syncSession);
+      window.removeEventListener(SESSION_EVENT, syncSession);
+    };
+  }, []);
 
   const saveSession = useCallback((newSession: GuestSession) => {
-    localStorage.setItem('niver_session', JSON.stringify(newSession));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
     setSessionState(newSession);
+    window.dispatchEvent(new Event(SESSION_EVENT));
   }, []);
 
   const clearSession = useCallback(() => {
-    localStorage.removeItem('niver_session');
+    localStorage.removeItem(SESSION_KEY);
     setSessionState(null);
+    window.dispatchEvent(new Event(SESSION_EVENT));
   }, []);
 
   return { session, saveSession, clearSession };

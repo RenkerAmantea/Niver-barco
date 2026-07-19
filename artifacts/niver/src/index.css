@@ -100,8 +100,11 @@
   body {
     @apply font-sans antialiased text-foreground min-h-screen bg-background;
     background-image: radial-gradient(circle at 100% 0%, hsl(265 78% 15%) 0%, transparent 40%),
-                      radial-gradient(circle at 0% 100%, hsl(244 59% 11%) 0%, transparent 40%);
+                      radial-gradient(circle at 0% 100%, hsl(244 59% 11%) 0%, transparent 40%),
+                      linear-gradient(135deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: auto, auto, 22px 22px;
     background-attachment: fixed;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -141,6 +144,169 @@
   }
 
   .glass-card {
-    @apply bg-card/40 backdrop-blur-md border border-white/5 shadow-2xl;
+    @apply bg-card/45 backdrop-blur-xl border border-white/10 shadow-2xl;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 18px 48px rgba(0,0,0,.22);
+  }
+
+  .captain-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(105deg, rgba(246,204,107,.08), transparent 31%, rgba(139,92,246,.08) 72%, transparent);
+    opacity: .9;
+  }
+
+  .captain-mark {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 8px 20px rgba(226,169,53,.12);
+  }
+
+  .landing-scene {
+    isolation: isolate;
+  }
+
+  .landing-scene::before {
+    content: '';
+    position: absolute;
+    inset: 23rem -1rem -8rem;
+    z-index: -2;
+    background: linear-gradient(180deg, rgba(5, 8, 25, .96) 0%, rgba(7, 11, 34, .82) 42%, rgba(6, 7, 24, .97) 100%),
+      url('/renker-de-bolso-hero.jpg') center bottom / cover no-repeat;
+    filter: saturate(.68) contrast(1.02) blur(3px);
+    opacity: .48;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 75%, transparent 100%);
+  }
+
+  .landing-scene::after {
+    content: '';
+    position: absolute;
+    inset: 13rem -1rem auto;
+    z-index: -1;
+    height: 18rem;
+    background: radial-gradient(ellipse at center, rgba(238, 66, 172, .2), transparent 64%);
+    filter: blur(30px);
+    pointer-events: none;
+  }
+
+  .hero-kicker {
+    letter-spacing: .27em;
+    text-shadow: 0 0 20px rgba(255, 206, 112, .42);
+  }
+
+  .premium-input {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 14px 30px rgba(0,0,0,.2);
+  }
+
+  .premium-cta {
+    box-shadow: 0 0 0 1px rgba(255, 229, 146, .24), 0 14px 32px rgba(201,168,76,.26), inset 0 1px 0 rgba(255,255,255,.36);
+  }
+
+  .premium-cta:hover:not(:disabled) {
+    box-shadow: 0 0 0 1px rgba(255, 239, 181, .38), 0 18px 42px rgba(232, 174, 68, .38), inset 0 1px 0 rgba(255,255,255,.52);
+  }
+
+  .stat-glass {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 10px 26px rgba(0,0,0,.14);
+  }
+
+  .reaction-chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-xs text-white/75 transition-colors duration-200 hover:border-primary/50 hover:bg-primary/10;
+  }
+
+  .reaction-chip-active {
+    @apply border-primary/60 bg-primary/20 text-primary;
+  }
+
+  .reaction-burst {
+    animation: reaction-burst 420ms cubic-bezier(.2, 1.6, .45, 1);
+  }
+
+  .panel-enter {
+    animation: panel-enter 360ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+
+  @keyframes panel-enter {
+    from { opacity: 0; transform: translateY(12px); filter: blur(5px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+
+  .rsvp-notice {
+    animation: notice-enter 320ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+
+  .gallery-page { min-width: 0; }
+
+  .forum-page { min-width: 0; }
+  .forum-post { box-shadow: inset 0 1px 0 rgba(255,255,255,.025); }
+  .forum-composer { box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
+
+  .gallery-counter {
+    flex: none;
+    border: 1px solid rgba(255, 214, 121, .22);
+    border-radius: 999px;
+    background: rgba(245, 197, 92, .08);
+    padding: .42rem .7rem;
+    color: #f9d98a;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  .upload-deck {
+    display: flex;
+    align-items: center;
+    gap: .95rem;
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 1.35rem;
+    background: linear-gradient(120deg, rgba(253, 208, 102, .12), rgba(131, 70, 220, .13) 48%, rgba(11, 14, 38, .8));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 16px 36px rgba(0,0,0,.19);
+    padding: 1.1rem 1.15rem;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  }
+  .upload-deck:hover:not(:disabled) { border-color: rgba(255,217,132,.48); background: linear-gradient(120deg, rgba(253,208,102,.2), rgba(131,70,220,.2) 48%, rgba(11,14,38,.84)); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 18px 40px rgba(53, 22, 109, .3); }
+  .upload-deck-icon { display: grid; width: 2.65rem; height: 2.65rem; flex: none; place-items: center; border-radius: .9rem; color: #1d1204; background: linear-gradient(135deg,#ffe6a2,#cf8c33); box-shadow: 0 7px 18px rgba(231,172,58,.25); }
+  .upload-deck strong, .upload-deck small { display: block; }
+  .upload-deck strong { color: #fff0cf; font-family: var(--app-font-display); font-size: 1rem; }
+  .upload-deck small { margin-top: .16rem; color: rgba(255,255,255,.55); font-size: .75rem; }
+  .gallery-status { border: 1px solid rgba(255,215,126,.2); border-radius: .8rem; background: rgba(255,205,95,.08); padding: .7rem .85rem; color: #f7d891; font-size: .85rem; }
+  .gallery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+  .gallery-photo, .gallery-skeleton { position: relative; min-width: 0; min-height: 9rem; overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 1.15rem; background: rgba(255,255,255,.05); }
+  .gallery-photo { aspect-ratio: 1 / 1.08; }
+  .gallery-photo img { width: 100%; height: 100%; object-fit: cover; transition: transform 340ms cubic-bezier(.16,1,.3,1); }
+  .gallery-photo:hover img { transform: scale(1.04); }
+  .gallery-photo figcaption { position: absolute; inset: auto 0 0; padding: 2.1rem .75rem .65rem; background: linear-gradient(transparent, rgba(4,6,20,.88)); color: #fff5dd; font-size: .75rem; }
+  .gallery-empty { border: 1px dashed rgba(253,209,104,.35); border-radius: 1.45rem; background: rgba(250,204,95,.05); padding: 3.3rem 1.5rem; text-align: center; }
+  .gallery-empty h2 { margin-top: 1rem; color: #fff1d0; font-family: var(--app-font-display); font-size: 1.2rem; }
+  .gallery-empty p { margin: .55rem auto 0; max-width: 18rem; color: rgba(255,255,255,.57); font-size: .86rem; line-height: 1.55; }
+
+  @keyframes notice-enter {
+    from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
+    to { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+
+  @keyframes reaction-burst {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.28) rotate(-7deg); box-shadow: 0 0 18px hsl(var(--primary) / .65); }
+    100% { transform: scale(1); }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .rsvp-selected { animation: rsvp-confirm 380ms cubic-bezier(.2, 1.4, .4, 1); }
+    @keyframes rsvp-confirm { 0% { transform: scale(.96); } 55% { transform: scale(1.045); } 100% { transform: scale(1); } }
+  }
+
+  @media (min-width: 640px) {
+    .gallery-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  }
+
+  @media (max-width: 430px) {
+    .landing-scene { padding-left: .15rem; padding-right: .15rem; }
+    .landing-scene > div:first-child { margin-bottom: 2.2rem; }
+    .hero-kicker { letter-spacing: .16em; }
+    .gallery-page { padding-left: .1rem; padding-right: .1rem; }
+    .forum-page { padding-left: .1rem; padding-right: .1rem; }
+    .forum-post > div { padding-left: 1rem; padding-right: 1rem; }
   }
 }

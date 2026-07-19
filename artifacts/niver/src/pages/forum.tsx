@@ -21,6 +21,33 @@ import { ptBR } from "date-fns/locale";
 import { MessageSquare, Send, CornerDownRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const reactionOptions = [
+  { key: 'heart', label: '❤' }, { key: 'fire', label: '🔥' }, { key: 'boat', label: '⚓' }, { key: 'party', label: '✦' },
+];
+
+function ReactionBar({ postId }: { postId: number }) {
+  const { session } = useSession();
+  const [reactions, setReactions] = useState<Record<string, { count: number; reacted: boolean }>>({});
+  const [burst, setBurst] = useState<string | null>(null);
+  const load = async () => {
+    const response = await fetch(`/api/posts/${postId}/reactions`);
+    if (!response.ok) return;
+    const data = await response.json();
+    const mine = new Set((data.reactions ?? []).filter((item: { guest_id: number }) => item.guest_id === session?.id).map((item: { emoji: string }) => item.emoji));
+    const next = Object.fromEntries(Object.entries(data.summary).map(([emoji, value]: [string, any]) => [emoji, { ...value, reacted: mine.has(emoji) }]));
+    setReactions(next);
+  };
+  useEffect(() => { void load(); }, [postId, session?.id]);
+  const toggle = async (emoji: string) => {
+    if (!session?.id) return;
+    const active = reactions[emoji]?.reacted;
+    await fetch(`/api/posts/${postId}/reactions`, { method: active ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, emoji }) });
+    if (!active) { setBurst(emoji); window.setTimeout(() => setBurst(null), 420); }
+    void load();
+  };
+  return <div className="flex flex-wrap gap-2 pt-3">{reactionOptions.map(({ key, label }) => <button key={key} onClick={() => void toggle(key)} aria-label={`Reagir com ${key}`} className={cn("reaction-chip cursor-pointer", reactions[key]?.reacted && "reaction-chip-active", burst === key && "reaction-burst")}><span>{label}</span>{reactions[key]?.count > 0 && <span>{reactions[key].count}</span>}</button>)}</div>;
+}
+
 function PostReplies({ postId }: { postId: number }) {
   const { session } = useSession();
   const [content, setContent] = useState("");
@@ -54,20 +81,20 @@ function PostReplies({ postId }: { postId: number }) {
   if (isLoading) return <div className="text-sm text-muted-foreground pl-12 py-2">Carregando respostas...</div>;
 
   return (
-    <div className="pl-6 md:pl-12 pt-4 space-y-4 border-l border-white/5 ml-6">
+    <div className="ml-0 space-y-4 pt-4 md:ml-6 md:border-l md:border-white/5 md:pl-12">
       {replies?.map((reply) => (
-        <div key={reply.id} className="flex gap-3 relative">
-          <CornerDownRight className="absolute -left-6 top-3 h-4 w-4 text-white/10" />
+        <div key={reply.id} className="relative flex min-w-0 gap-2.5 md:gap-3">
+          <CornerDownRight className="absolute -left-6 top-3 hidden h-4 w-4 text-white/10 md:block" />
           <Avatar className="h-8 w-8 border-primary/20 shrink-0">
             {reply.guestAvatarUrl ? <AvatarImage src={reply.guestAvatarUrl} alt={reply.guestName} /> : null}
             <AvatarFallback className="text-xs bg-secondary text-primary">
               {reply.guestName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div className="bg-black/30 rounded-2xl rounded-tl-none px-4 py-2 border border-white/5 flex-1 max-w-[calc(100%-2rem)]">
-            <div className="flex items-baseline justify-between mb-1">
-              <span className="font-medium text-sm text-foreground">{reply.guestName}</span>
-              <span className="text-[10px] text-muted-foreground ml-2 whitespace-nowrap">
+          <div className="min-w-0 flex-1 rounded-2xl rounded-tl-none border border-white/5 bg-black/30 px-3.5 py-2">
+            <div className="mb-1 flex min-w-0 items-baseline justify-between gap-2">
+              <span className="truncate text-sm font-medium text-foreground">{reply.guestName}</span>
+              <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">
                 {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: ptBR })}
               </span>
             </div>
@@ -76,14 +103,14 @@ function PostReplies({ postId }: { postId: number }) {
         </div>
       ))}
 
-      <form onSubmit={handleSubmit} className="flex gap-3 relative mt-4">
-        <CornerDownRight className="absolute -left-6 top-3 h-4 w-4 text-white/10" />
+      <form onSubmit={handleSubmit} className="relative mt-4 flex min-w-0 gap-2.5 md:gap-3">
+        <CornerDownRight className="absolute -left-6 top-3 hidden h-4 w-4 text-white/10 md:block" />
         <Avatar className="h-8 w-8 border-primary/20 shrink-0">
           <AvatarFallback className="text-xs bg-secondary text-primary">
             {session?.name.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1 flex gap-2">
+        <div className="flex min-w-0 flex-1 gap-2">
           <Textarea
             ref={inputRef}
             value={content}
@@ -152,7 +179,7 @@ export default function Forum() {
   };
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="panel-enter forum-page mx-auto w-full max-w-3xl space-y-7 pb-12">
       
       <div className="mb-6">
         <h2 className="text-2xl font-display font-semibold">Mural do Evento</h2>
@@ -160,9 +187,9 @@ export default function Forum() {
       </div>
 
       {/* New Post Form */}
-      <Card className="border-primary/20 bg-card shadow-[0_0_20px_rgba(201,168,76,0.05)]">
+      <Card className="border-primary/20 bg-card/80 shadow-[0_0_20px_rgba(201,168,76,0.05)]">
         <CardContent className="p-4 sm:p-6">
-          <form onSubmit={handleSubmit} className="flex gap-4">
+          <form onSubmit={handleSubmit} className="flex min-w-0 gap-3 sm:gap-4">
             <Avatar className="h-10 w-10 border-primary/20 hidden sm:flex shrink-0">
               {session.avatarUrl ? <AvatarImage src={session.avatarUrl} alt={session.name} /> : null}
               <AvatarFallback className="bg-secondary text-primary">
@@ -174,7 +201,7 @@ export default function Forum() {
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder={`No que você está pensando, ${session.name.split(' ')[0]}?`}
-                className="bg-black/20 border-white/10 text-base focus-visible:ring-primary/50 resize-y min-h-[100px]"
+                className="forum-composer bg-black/25 border-white/10 text-base leading-relaxed focus-visible:ring-primary/50 resize-y min-h-[108px]"
               />
               <div className="flex justify-end">
                 <Button 
@@ -195,7 +222,7 @@ export default function Forum() {
         {isLoadingPosts ? (
           <div className="space-y-6">
             {[1, 2].map(i => (
-              <Card key={i} className="bg-black/20 border-white/5 animate-pulse">
+            <Card key={i} className="bg-black/20 border-white/5 animate-pulse">
                 <CardContent className="p-6">
                   <div className="flex gap-4 mb-4">
                     <div className="h-12 w-12 rounded-full bg-white/5" />
@@ -217,9 +244,9 @@ export default function Forum() {
           </div>
         ) : (
           posts?.map((post) => (
-            <Card key={post.id} className="bg-black/20 border-white/5 overflow-hidden transition-all hover:border-white/10">
+            <Card key={post.id} className="forum-post bg-black/20 border-white/5 overflow-hidden transition-all hover:border-white/10">
               <CardContent className="p-4 sm:p-6 pb-4">
-                <div className="flex gap-4">
+                <div className="flex min-w-0 gap-3 sm:gap-4">
                   <Avatar className="h-12 w-12 border-primary/20 shrink-0">
                     {post.guestAvatarUrl ? <AvatarImage src={post.guestAvatarUrl} alt={post.guestName} /> : null}
                     <AvatarFallback className="bg-secondary text-primary">
@@ -254,6 +281,7 @@ export default function Forum() {
                         }
                       </Button>
                     </div>
+                    <ReactionBar postId={post.id} />
                   </div>
                 </div>
 

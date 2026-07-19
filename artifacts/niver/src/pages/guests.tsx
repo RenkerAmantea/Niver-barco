@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
 import { 
@@ -6,6 +6,7 @@ import {
   useUpdateRsvp, 
   getListGuestsQueryKey, 
   getGetRsvpSummaryQueryKey,
+  getGetGuestQueryKey,
   useGetGuest,
   GuestRsvpStatus,
   Guest
@@ -15,7 +16,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, HelpCircle, XCircle } from "lucide-react";
+import { CheckCircle2, HelpCircle, XCircle, Check } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Guests() {
@@ -31,10 +33,11 @@ export default function Guests() {
 
   const { data: guests, isLoading: isLoadingGuests } = useListGuests();
   const { data: currentUser } = useGetGuest(session?.id ?? 0, { 
-    query: { enabled: !!session?.id } 
+    query: { enabled: !!session?.id, queryKey: getGetGuestQueryKey(session?.id ?? 0) }
   });
   
   const updateRsvp = useUpdateRsvp();
+  const [rsvpNotice, setRsvpNotice] = useState<string | null>(null);
 
   if (!session) return null;
 
@@ -48,11 +51,21 @@ export default function Guests() {
       { guestId: session.id, data: { rsvpStatus: rsvpStatusValue } },
       {
         onSuccess: (updatedGuest) => {
+          // Update the exact query that drives the three RSVP buttons.  Updating
+          // only the list/summary left this screen visually stuck on the previous
+          // choice until a reload.
+          queryClient.setQueryData(getGetGuestQueryKey(session.id), updatedGuest);
           queryClient.setQueryData(getListGuestsQueryKey(), (old: Guest[] | undefined) => {
             if (!old) return old;
             return old.map(g => g.id === updatedGuest.id ? updatedGuest : g);
           });
           queryClient.invalidateQueries({ queryKey: getGetRsvpSummaryQueryKey() });
+          const copy: Record<string, string> = {
+            going: 'Você marcou: eu vou. O barco agradece sua coragem.',
+            maybe: 'Você marcou: talvez. A indecisão foi oficialmente registrada.',
+            not_going: 'Você marcou: não vou. Vamos sentir sua ausência no convés.',
+          };
+          setRsvpNotice(copy[updatedGuest.rsvpStatus] ?? 'Presença atualizada.');
         }
       }
     );
@@ -107,7 +120,7 @@ export default function Guests() {
   const currentStatus = currentUser?.rsvpStatus || GuestRsvpStatus.pending;
 
   return (
-    <div className="space-y-12 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="panel-enter space-y-12 pb-12">
       
       {/* User RSVP Action Area */}
       <section>
@@ -120,17 +133,18 @@ export default function Guests() {
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+            <div className="grid w-full grid-cols-3 gap-2 sm:gap-4">
               <Button
                 size="lg"
                 onClick={() => handleRsvp(GuestRsvpStatus.going)}
                 disabled={updateRsvp.isPending}
                 className={cn(
-                  "h-14 sm:w-48 text-base transition-all",
+                  "h-16 w-full px-1.5 text-xs font-semibold sm:px-2 sm:text-base transition-all",
                   currentStatus === GuestRsvpStatus.going 
-                    ? "bg-primary text-black hover:bg-primary/90 shadow-[0_0_15px_rgba(201,168,76,0.3)] scale-105" 
+                    ? "rsvp-selected bg-primary text-black hover:bg-primary/90 shadow-[0_0_15px_rgba(201,168,76,0.3)]"
                     : "bg-black/40 text-foreground border border-white/10 hover:border-primary/50 hover:bg-primary/10"
                 )}
+                aria-pressed={currentStatus === GuestRsvpStatus.going}
               >
                 <CheckCircle2 className={cn("mr-2 h-5 w-5", currentStatus === GuestRsvpStatus.going ? "text-black" : "text-primary")} />
                 Vou
@@ -141,11 +155,12 @@ export default function Guests() {
                 onClick={() => handleRsvp(GuestRsvpStatus.maybe)}
                 disabled={updateRsvp.isPending}
                 className={cn(
-                  "h-14 sm:w-48 text-base transition-all",
+                  "h-16 w-full px-1.5 text-xs font-semibold sm:px-2 sm:text-base transition-all",
                   currentStatus === GuestRsvpStatus.maybe 
-                    ? "bg-secondary text-white hover:bg-secondary/90 border border-primary/30 scale-105" 
-                    : "bg-black/40 text-foreground border border-white/10 hover:border-white/30 hover:bg-white/5"
+                    ? "rsvp-selected border border-[#b88cff]/65 bg-[#62358c] text-white shadow-[0_0_18px_rgba(157,116,255,.28)] hover:bg-[#70409f]"
+                    : "bg-black/40 text-foreground border border-white/10 hover:border-[#b88cff]/50 hover:bg-[#62358c]/20"
                 )}
+                aria-pressed={currentStatus === GuestRsvpStatus.maybe}
               >
                 <HelpCircle className="mr-2 h-5 w-5 text-muted-foreground" />
                 Talvez
@@ -156,18 +171,26 @@ export default function Guests() {
                 onClick={() => handleRsvp(GuestRsvpStatus.not_going)}
                 disabled={updateRsvp.isPending}
                 className={cn(
-                  "h-14 sm:w-48 text-base transition-all",
+                  "h-16 w-full px-1.5 text-xs font-semibold sm:px-2 sm:text-base transition-all",
                   currentStatus === GuestRsvpStatus.not_going 
-                    ? "bg-destructive/20 text-destructive-foreground hover:bg-destructive/30 border border-destructive/50 scale-105" 
+                    ? "rsvp-selected bg-destructive/20 text-destructive-foreground hover:bg-destructive/30 border border-destructive/50"
                     : "bg-black/40 text-foreground border border-white/10 hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive-foreground"
                 )}
+                aria-pressed={currentStatus === GuestRsvpStatus.not_going}
               >
                 <XCircle className="mr-2 h-5 w-5 text-destructive/70" />
-                Não Poderei
+                Não vou
               </Button>
             </div>
+            {rsvpNotice && <div className="rsvp-notice flex w-full items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-center text-sm text-primary"><Check className="h-4 w-4 shrink-0" />{rsvpNotice}</div>}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="flex justify-center -mt-4">
+        <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10" onClick={() => setLocation("/forum")}>
+          <MessageSquare className="mr-2 h-4 w-4" /> Abrir mural e bate-papo
+        </Button>
       </section>
 
       {/* Guest List Tabs */}

@@ -8,6 +8,8 @@ import { Layout } from '@/components/layout';
 import Landing from '@/pages/landing';
 import Guests from '@/pages/guests';
 import Forum from '@/pages/forum';
+import Event from '@/pages/event';
+import Gallery from '@/pages/gallery';
 
 const queryClient = new QueryClient();
 
@@ -16,8 +18,10 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Landing} />
+        <Route path="/evento" component={Event} />
         <Route path="/convidados" component={Guests} />
         <Route path="/forum" component={Forum} />
+        <Route path="/fotos" component={Gallery} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

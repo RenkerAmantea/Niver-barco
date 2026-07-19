@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
-import { LogOut, PartyPopper } from "lucide-react";
+import { LogOut, ShipWheel, CalendarDays, UsersRound, MessageCircle, Images, Waves } from "lucide-react";
 import { Button } from "./ui/button";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -13,61 +13,43 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setLocation("/");
   };
 
-  const navLinks = session
-    ? [
-        { href: "/convidados", label: "Convidados" },
-        { href: "/forum", label: "Mural" },
-      ]
-    : [];
+  const navLinks = [
+    { href: "/evento", label: "Evento", icon: CalendarDays },
+    { href: "/convidados", label: "Convidados", icon: UsersRound },
+    { href: "/forum", label: "Mural", icon: MessageCircle },
+    { href: "/fotos", label: "Fotos", icon: Images },
+  ];
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/60 backdrop-blur-xl">
-        <div className="container mx-auto max-w-4xl flex h-16 items-center justify-between px-4">
-          <Link href={session ? "/convidados" : "/"} className="flex items-center gap-2 transition-opacity hover:opacity-80">
-            <PartyPopper className="h-5 w-5 text-primary" />
-            <span className="font-display font-semibold text-lg tracking-tight hidden sm:inline-block text-primary">
-              Renker Niver de Bolso
-            </span>
+      <header className="captain-bar sticky top-3 z-50 mx-auto w-[calc(100%-1.25rem)] max-w-4xl rounded-[1.15rem] border border-white/12 bg-[#0a0c1d]/72 shadow-[inset_0_1px_0_rgba(255,255,255,.11),0_18px_42px_rgba(0,0,0,.32)] backdrop-blur-2xl">
+        <div className="relative mx-auto flex h-[3.85rem] items-center justify-between px-3 sm:px-4">
+          <Link href={session ? "/evento" : "/"} aria-label="Ir para o evento" className="captain-mark flex h-10 w-10 items-center justify-center rounded-xl border border-[#f9d98a]/25 bg-[#f6cc6b]/[.09] text-[#f9d98a] transition-colors hover:bg-[#f6cc6b]/[.17]">
+            <ShipWheel className="h-[1.15rem] w-[1.15rem]" />
+          </Link>
+          <Link href={session ? "/evento" : "/"} className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap text-center transition-opacity hover:opacity-85">
+            <Waves className="hidden h-3.5 w-3.5 text-[#9d74ff] sm:block" />
+            <span className="font-display text-[.7rem] font-semibold uppercase tracking-[.14em] text-[#fff0c8] sm:text-xs sm:tracking-[.18em]">Renker Niver Barco</span>
           </Link>
 
           {session && (
-            <nav className="flex items-center gap-6">
-              <div className="flex items-center gap-4">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "text-sm font-medium transition-colors hover:text-primary",
-                      location === link.href ? "text-primary" : "text-muted-foreground"
-                    )}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-              
-              <div className="flex items-center gap-3 border-l border-white/10 pl-6">
-                <span className="text-sm text-foreground/80 hidden sm:inline-block">
-                  Olá, <strong className="text-foreground">{session.name}</strong>
-                </span>
-                <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
-                  <LogOut className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
-                </Button>
-              </div>
-            </nav>
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair" className="h-10 w-10 cursor-pointer rounded-xl border border-white/[.07] bg-white/[.035] hover:bg-white/[.08]">
+              <LogOut className="h-4 w-4 text-white/60 transition-colors hover:text-[#ffb0b0]" />
+            </Button>
           )}
         </div>
       </header>
 
-      <main className="flex-1 container mx-auto max-w-4xl px-4 py-8 relative">
+      <main className="flex-1 container mx-auto max-w-4xl px-4 py-8 pt-12 relative">
         {children}
       </main>
       
-      <footer className="border-t border-white/5 py-8 text-center text-sm text-muted-foreground">
-        <p>Um evento exclusivo. Prepare-se.</p>
+      <footer className="border-t border-white/5 py-8 pb-24 text-center text-sm text-muted-foreground">
+        <p>Renker de Bolso, porque nem todo aniversário precisa de uma operação logística de médio porte.</p>
       </footer>
+      {session && <nav aria-label="Navegação principal" className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-lg items-center justify-around rounded-2xl border border-white/12 bg-[#090b1c]/84 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,.07),0_14px_32px_rgba(0,0,0,.36)] backdrop-blur-xl">
+        {navLinks.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={cn("flex min-w-15 cursor-pointer flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] transition-all", location === href ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")}><Icon className="h-4 w-4" />{label}</Link>)}
+      </nav>}
     </div>
   );
 }
