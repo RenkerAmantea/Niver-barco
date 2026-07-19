@@ -1,4 +1,4 @@
-const CACHE = 'niver-barco-shell-v6';
+const CACHE = 'niver-barco-shell-v7';
 const SHELL = [
   '/',
   '/evento',
@@ -22,11 +22,22 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin || event.request.url.includes('/api/')) return;
+  // Navegação nunca cai no HTML armazenado quando há rede: é o ponto mais
+  // importante para não executar bundle antigo após um deploy.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(fetch(event.request).catch(() => caches.match('/')));
+    return;
+  }
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const cached = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, cached));
+        // Só assets versionados entram no cache dinâmico. Não guardar HTML,
+        // manifest ou service worker impede que a versão antiga se perpetue.
+        const destination = event.request.destination;
+        if (destination === 'script' || destination === 'style' || destination === 'image' || destination === 'font') {
+          const cached = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, cached));
+        }
         return response;
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/'))),

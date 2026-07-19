@@ -10,7 +10,9 @@ const paymentLabel = { pending: 'Pendente', paid: 'Pago', on_site: 'Paga no loca
 
 export default function Admin() {
   const { session } = useSession(); const [password, setPassword] = useState(() => sessionStorage.getItem('niver_admin_password') ?? '');
-  const [adminUnlocked, setAdminUnlocked] = useState(() => Boolean(session?.isAdmin)); const [authError, setAuthError] = useState('');
+  // Nunca confiar em localStorage/sessionStorage para revelar controles de admin.
+  // Mesmo a conta do capitão precisa ser confirmada pelo backend antes de renderizar o painel.
+  const [adminUnlocked, setAdminUnlocked] = useState(false); const [authError, setAuthError] = useState('');
   const [title, setTitle] = useState('Recado do barco'), [body, setBody] = useState(''), [url, setUrl] = useState('/evento'), [status, setStatus] = useState('');
   const [inviteName, setInviteName] = useState(''), [inviteStatus, setInviteStatus] = useState(''), [lastCreatedUrl, setLastCreatedUrl] = useState(''), [invites, setInvites] = useState<Invite[]>([]);
   const [ledger, setLedger] = useState<LedgerGuest[]>([]), [surpriseName, setSurpriseName] = useState(''), [removingId, setRemovingId] = useState<number | null>(null);
@@ -18,7 +20,13 @@ export default function Admin() {
   const headers = () => ({ 'Content-Type': 'application/json', ...(password ? { Authorization: `Bearer ${password}` } : {}), ...(session?.adminToken ? { 'X-Niver-Admin-Invite': session.adminToken } : {}) });
   const remember = () => password && sessionStorage.setItem('niver_admin_password', password);
   const load = async () => { const [a, b, c, d] = await Promise.all([fetch('/api/admin/invites', { headers: headers() }), fetch('/api/admin/payments', { headers: headers() }), fetch('/api/posts'), fetch('/api/photos')]); if (!a.ok || !b.ok) return false; setInvites(await a.json()); setLedger((await b.json()).guests); if (c.ok) setPosts(await c.json()); if (d.ok) setPhotos(await d.json()); return true; };
-  useEffect(() => { if (session?.isAdmin) void load().then(setAdminUnlocked); }, [session?.isAdmin]);
+  useEffect(() => {
+    if (!session?.isAdmin) return;
+    void load().then((ok) => {
+      setAdminUnlocked(ok);
+      if (!ok) setAuthError('Não foi possível confirmar o acesso administrativo.');
+    });
+  }, [session?.isAdmin]);
   const unlockAdmin = async () => { setAuthError(''); const ok = await load(); if (!ok) { sessionStorage.removeItem('niver_admin_password'); setAdminUnlocked(false); setAuthError('Senha incorreta. Tente novamente.'); return; } remember(); setAdminUnlocked(true); };
   const send = async (e: FormEvent) => { e.preventDefault(); setStatus('Enviando…'); const r = await fetch('/api/admin/notify', { method: 'POST', headers: headers(), body: JSON.stringify({ title, body, url }) }), d = await r.json(); if (!r.ok) return setStatus(d.error ?? 'Não foi possível enviar.'); remember(); setStatus(`Aviso salvo para ${d.saved} convidado(s). Push entregue em ${d.sent} aparelho(s).`); };
   const createInvite = async (e: FormEvent) => { e.preventDefault(); const r = await fetch('/api/admin/invites', { method: 'POST', headers: headers(), body: JSON.stringify({ name: inviteName }) }), d = await r.json(); if (!r.ok) return setInviteStatus(d.error ?? 'Não foi possível criar.'); remember(); setInviteName(''); setLastCreatedUrl(d.url); await navigator.clipboard?.writeText(d.url); setInviteStatus(`Convite de ${d.name} criado e copiado.`); await load(); };

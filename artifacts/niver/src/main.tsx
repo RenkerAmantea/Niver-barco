@@ -4,12 +4,16 @@ import App from './App';
 
 import './index.css';
 
-if ('serviceWorker' in navigator) window.addEventListener('load', () => void navigator.serviceWorker.register('/sw.js').then((registration) => {
+if ('serviceWorker' in navigator) window.addEventListener('load', () => void navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then((registration) => {
   let refreshed = false;
   const announceUpdate = () => window.dispatchEvent(new CustomEvent('niver:pwa-update-ready', { detail: registration }));
   const activateUpdate = () => registration.waiting?.postMessage({ type: 'SKIP_WAITING' });
 
-  void registration.update();
+  const checkForUpdate = () => void registration.update();
+  checkForUpdate();
+  // Alguns launchers mantêm o PWA aberto por muito tempo. Revalidar evita que
+  // uma pessoa fique numa versão antiga só porque não fechou o aplicativo.
+  const updateTimer = window.setInterval(checkForUpdate, 60_000);
   if (registration.waiting) announceUpdate();
   registration.addEventListener('updatefound', () => registration.installing?.addEventListener('statechange', () => {
     if (registration.installing?.state !== 'installed' || !navigator.serviceWorker.controller) return;
@@ -24,7 +28,8 @@ if ('serviceWorker' in navigator) window.addEventListener('load', () => void nav
       window.location.reload();
     }
   });
-  window.addEventListener('focus', () => void registration.update());
+  window.addEventListener('focus', checkForUpdate);
+  window.addEventListener('beforeunload', () => window.clearInterval(updateTimer), { once: true });
 }));
 
 createRoot(document.getElementById('root')!).render(<App />);
