@@ -16,7 +16,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { data: currentGuest } = useGetGuest(session?.id ?? 0, { query: { enabled: !!session?.id, queryKey: getGetGuestQueryKey(session?.id ?? 0) } });
   const [showPushNudge, setShowPushNudge] = useState(false);
   useEffect(() => {
-    if (!session || !('Notification' in window) || Notification.permission !== 'default') return;
+    if (!session || !('Notification' in window)) return;
     const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
     if (standalone && !sessionStorage.getItem('niver_push_nudge_seen')) setShowPushNudge(true);
   }, [session]);
