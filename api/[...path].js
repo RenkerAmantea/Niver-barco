@@ -49,6 +49,21 @@ async function ensurePhotoBucket() {
   }
 }
 
+async function deleteGuestMedia(guestId) {
+  // Object deletion is deliberately best-effort: database cleanup must still
+  // work if a bucket was never created or an old test account has no media.
+  for (const prefix of [`guests/${guestId}/`, `avatars/${guestId}/`]) {
+    const listedResponse = await storage(`object/list/${PHOTO_BUCKET}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefix, limit: 100, offset: 0 }),
+    });
+    const objects = await readJson(listedResponse);
+    if (!listedResponse.ok || !Array.isArray(objects) || !objects.length) continue;
+    const prefixes = objects.map((object) => object.name?.startsWith(prefix) ? object.name : `${prefix}${object.name}`).filter(Boolean);
+    if (prefixes.length) await storage(`object/${PHOTO_BUCKET}`, { method: 'DELETE', body: JSON.stringify({ prefixes }) });
+  }
+}
+
 function publicPhotoUrl(objectName) {
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${objectName.split('/').map(encodeURIComponent).join('/')}`;
 }
@@ -409,6 +424,22 @@ export default async function handler(req, res) {
       for (const marker of markers ?? []) { const payment = paymentFromContent(marker.content); if (payment) payments.set(marker.guest_id, payment); }
       const settingsMarker = [...(markers ?? [])].reverse().find((marker) => paymentSettingsFromContent(marker.content));
       return res.status(200).json({ guests: (guests ?? []).filter((guest) => !hidden.has(guest.id)).map((guest) => ({ ...guest, payment: payments.get(guest.id)?.status ?? 'pending' })), reminderEnabled: paymentSettingsFromContent(settingsMarker?.content)?.enabled ?? false });
+    }
+
+    const adminGuestMatch = path.match(/^\/admin\/guests\/(\d+)$/);
+    if (adminGuestMatch && req.method === 'DELETE') {
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      const guestId = Number(adminGuestMatch[1]);
+      if (!Number.isInteger(guestId)) return res.status(400).json({ error: 'Convidado inválido.' });
+      const guestResponse = await rest(`niver_barco_guests?select=id,name&id=eq.${guestId}`);
+      const guests = await readJson(guestResponse);
+      const guest = guests?.[0];
+      if (!guestResponse.ok) return res.status(guestResponse.status).json(guests);
+      if (!guest) return res.status(404).json({ error: 'Convidado não encontrado.' });
+      const deleteResponse = await rest(`niver_barco_guests?id=eq.${guestId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (!deleteResponse.ok) return res.status(deleteResponse.status).json(await readJson(deleteResponse));
+      await deleteGuestMedia(guestId);
+      return res.status(200).json({ ok: true, id: guestId, name: guest.name });
     }
 
     const paymentMatch = path.match(/^\/admin\/payments\/(\d+)$/);

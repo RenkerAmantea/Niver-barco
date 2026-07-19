@@ -104,6 +104,7 @@ export default function Landing() {
           </div>}
         </CardContent>
       </Card>
+      <button type="button" onClick={() => setLocation('/admin')} className="-mt-5 text-[10px] font-medium tracking-[.08em] text-white/25 transition hover:text-white/55" aria-label="Abrir acesso administrativo">acesso admin</button>
     </div>
   );
 }
