@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, HelpCircle, XCircle, ArrowRight, Sparkles } from "lucide-react";
-import { avatarColors, avatarOptions, makeAvatar } from '@/lib/avatar-options';
+import { avatarAccents, avatarOptions, makeAvatar } from '@/lib/avatar-options';
 
 export default function Landing() {
   const { session, lastSession, saveSession, resumeLastSession } = useSession();
@@ -32,7 +32,7 @@ export default function Landing() {
     setIsSubmitting(true);
     try {
       createGuest.mutate(
-      { data: { name: name.trim(), avatarUrl: makeAvatar(avatarOptions[Math.floor(Math.random() * avatarOptions.length)].id, avatarColors[Math.floor(Math.random() * avatarColors.length)]) } },
+      { data: { name: name.trim(), avatarUrl: makeAvatar(avatarOptions[Math.floor(Math.random() * avatarOptions.length)].id, avatarAccents[Math.floor(Math.random() * avatarAccents.length)].id) } },
         {
           onSuccess: (guest) => {
             saveSession({ id: guest.id, name: guest.name, avatarUrl: guest.avatarUrl });
