@@ -32,11 +32,20 @@ export default function Event() {
       <div className="mt-7 grid grid-cols-3 gap-2 text-center text-xs text-white/75"><div className="rounded-2xl bg-black/20 p-3"><CalendarDays className="mx-auto mb-2 h-4 w-4 text-primary"/>Terça<br/>19h</div><div className="rounded-2xl bg-black/20 p-3"><ShipWheel className="mx-auto mb-2 h-4 w-4 text-primary"/>Barco<br/>atracado</div><div className="rounded-2xl bg-black/20 p-3"><MapPin className="mx-auto mb-2 h-4 w-4 text-primary"/>Brasília<br/>DF</div></div>
     </section>
 
-    <section className="relative overflow-hidden rounded-3xl border border-[#f6ce7c]/35 bg-[linear-gradient(135deg,rgba(243,190,79,.18),rgba(17,17,40,.96)_48%,rgba(82,45,16,.72))] p-5 shadow-[inset_0_1px_0_rgba(255,239,180,.16),0_18px_38px_rgba(0,0,0,.22)]">
-      <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#f6ce7c]/20 blur-3xl" />
-      <div className="relative flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[#ffe5a4]/35 bg-[#f6ce7c]/10 text-[#ffe3a0]"><ShipWheel className="h-5 w-5" /></span><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#ffe3a0]">Contribuição de bordo</p><h2 className="mt-1 font-display text-xl text-[#fff5d9]"><strong>R$20</strong> para limpeza e manutenção</h2></div></div>
-      <p className="relative mt-4 max-w-md text-sm leading-6 text-[#f8edd6]/82">Se não tiver condições de verdade, fala comigo — mas não deixe de ir.</p>
-      <button onClick={copyPix} className="relative mt-4 flex w-full items-center justify-between rounded-2xl border border-[#ffe0a0]/35 bg-[#070813]/48 px-4 py-3.5 text-left text-[#fff0c8] transition hover:bg-[#171326]/80"><span><span className="block text-[10px] uppercase tracking-widest text-[#ffe3a0]/75">PIX · toque para copiar</span><strong className="mt-1 block font-display text-lg tracking-[.08em]">61999898198</strong></span>{copied ? <span className="flex items-center gap-2 text-sm font-medium text-emerald-200"><Check className="h-5 w-5" />Copiado</span> : <Copy className="h-5 w-5 text-[#ffe3a0]" />}</button>
+    <section className="glass-card relative overflow-hidden rounded-3xl p-5">
+      <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-primary/15 blur-3xl" />
+      <div className="relative flex items-start gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"><ShipWheel className="h-5 w-5" /></span>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-primary">Contribuição de bordo</p>
+          <h2 className="mt-1 font-display text-xl text-foreground"><strong className="text-primary">R$20</strong> para limpeza e manutenção</h2>
+        </div>
+      </div>
+      <p className="relative mt-4 max-w-md text-sm leading-6 text-muted-foreground">Se não tiver condições de verdade, fala comigo — mas não deixe de ir.</p>
+      <button onClick={copyPix} className="relative mt-4 flex w-full items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3.5 text-left transition hover:border-primary/35 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70">
+        <span><span className="block text-[10px] font-medium uppercase tracking-widest text-muted-foreground">PIX · toque para copiar</span><strong className="mt-1 block font-display text-lg tracking-[.08em] text-foreground">61999898198</strong></span>
+        {copied ? <span className="flex items-center gap-2 text-sm font-medium text-emerald-300"><Check className="h-5 w-5" />Copiado</span> : <Copy className="h-5 w-5 text-primary" />}
+      </button>
     </section>
 
     <section className="glass-card rounded-3xl p-5"><div className="flex gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"><PackageOpen className="h-5 w-5" /></span><div><p className="font-display text-lg text-foreground">Leva o que tiver vontade</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Pode levar sua bebida, petisco ou comida sem problema. É tudo liberado para entrar no barco.</p></div></div></section>
