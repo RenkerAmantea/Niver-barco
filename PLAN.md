@@ -96,21 +96,21 @@ Fase 5 concluída. O painel agora preserva o URL completo em campo selecionável
 
 ### Fase 6: Regressão de entrada e avatar
 
-- [~] **T6.1** — Corrigir a criação por convite para persistir um avatar náutico aleatório, no mesmo conjunto usado pelo login normal.
+- [x] **T6.1** — Corrigir a criação por convite para persistir um avatar náutico aleatório, no mesmo conjunto usado pelo login normal.
   - Verificação: convite novo retorna e salva `avatarUrl` não vazio; abrir o link mostra o avatar no perfil e no mural.
   - Estimativa: 15 min
   - Depende de: nenhuma
 
-- [ ] **T6.2** — Investigar e corrigir o bloqueio do CTA “Entrar no Evento” no fluxo nome + senha.
+- [x] **T6.2** — Investigar e corrigir o bloqueio do CTA “Entrar no Evento” no fluxo nome + senha.
   - Verificação: em uma sessão limpa, nome e senha válidos habilitam o CTA e concluem o login/criação.
   - Estimativa: 20 min
   - Depende de: nenhuma
 
-- [ ] **T6.3** — Validar ambos os fluxos em produção e publicar apenas após o QA.
+- [x] **T6.3** — Validar ambos os fluxos em produção e publicar apenas após o QA.
   - Verificação: build/typecheck do app, screenshot mobile e chamadas reais passam; dados temporários de QA são removidos.
   - Estimativa: 15 min
   - Depende de: T6.1, T6.2
 
 ## Estado atual
 
-Fase 6 em execução: corrigir regressões reportadas no avatar de convite individual e no CTA de entrada.
+Fase 6 concluída. Convite novo recebeu avatar persistido; convite legado sem avatar é preenchido no primeiro acesso. Login normal e criações diretas também recebem fallback seguro. No QA em produção: convite retornou avatar, login novo retornou avatar, senha de 3 caracteres retornou 400 com alerta visível e todos os perfis de QA foram apagados. Os aliases retornam `index-LWodt2Ht.js` com cache-buster.
