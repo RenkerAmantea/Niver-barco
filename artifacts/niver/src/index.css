@@ -113,6 +113,10 @@
 }
 
 @layer utilities {
+  .pwa-controls {
+    bottom: 5.8rem;
+  }
+
   .shimmer {
     position: relative;
     overflow: hidden;

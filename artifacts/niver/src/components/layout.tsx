@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound } from "lucide-react";
 import { Button } from "./ui/button";
 import { PresenceCard } from './presence-card';
+import { PwaControls } from './pwa-controls';
+import { NotificationBell } from './notification-bell';
 import { useGetGuest, GuestRsvpStatus, getGetGuestQueryKey } from '@workspace/api-client-react';
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -37,9 +39,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           {session && (
-            <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair" className="h-10 w-10 cursor-pointer rounded-xl border border-white/[.07] bg-white/[.035] hover:bg-white/[.08]">
+            <div className="flex items-center gap-2"><NotificationBell /><Button variant="ghost" size="icon" onClick={handleLogout} title="Sair" className="h-10 w-10 cursor-pointer rounded-xl border border-white/[.07] bg-white/[.035] hover:bg-white/[.08]">
               <LogOut className="h-4 w-4 text-white/60 transition-colors hover:text-[#ffb0b0]" />
-            </Button>
+            </Button></div>
           )}
         </div>
       </header>}
@@ -54,6 +56,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {session && <nav aria-label="Navegação principal" className="bottom-nav fixed inset-x-3 bottom-3 z-50 mx-auto max-w-lg">
         {navLinks.map(({ href, label, icon: Icon, featured }) => <Link key={href} href={href} aria-current={location === href ? 'page' : undefined} className={cn('bottom-nav-item', featured && 'bottom-nav-item-center')}><Icon className="bottom-nav-icon" /> <span className="bottom-nav-label">{label}</span></Link>)}
       </nav>}
+      <PwaControls hasSession={!!session} />
       {session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados' && <div className="fixed inset-0 z-[70] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md"><PresenceCard /></div></div>}
     </div>
   );
