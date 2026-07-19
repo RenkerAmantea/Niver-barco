@@ -13,6 +13,7 @@ export function PushControls() {
   const [subscribed, setSubscribed] = useState(false);
   const [checking, setChecking] = useState(true);
   const [message, setMessage] = useState('');
+  const [preferences, setPreferences] = useState(() => { try { return JSON.parse(localStorage.getItem('niver_push_preferences') ?? '{"mentions":true,"replies":true,"photos":true}'); } catch { return { mentions: true, replies: true, photos: true }; } });
 
   useEffect(() => {
     let active = true;
@@ -34,7 +35,7 @@ export function PushControls() {
     return () => { active = false; };
   }, []);
 
-  const enable = async () => {
+  const enable = async (nextPreferences = preferences) => {
     if (!session) return;
     setChecking(true); setMessage('');
     try {
@@ -54,7 +55,7 @@ export function PushControls() {
         await subscription.unsubscribe();
         subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) });
       }
-      const response = await fetch('/api/push/subscriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, subscription, preferences: { replies: true, mentions: true, photos: true } }) });
+      const response = await fetch('/api/push/subscriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, subscription, preferences: nextPreferences }) });
       if (!response.ok) throw new Error('Não foi possível salvar a inscrição deste aparelho.');
       setSubscribed(true);
       setMessage('Pronto: este aparelho receberá avisos do barco.');
@@ -64,7 +65,12 @@ export function PushControls() {
     } finally { setChecking(false); }
   };
 
+  const togglePreference = async (key: 'mentions' | 'replies' | 'photos') => {
+    const next = { ...preferences, [key]: !preferences[key] }; setPreferences(next); localStorage.setItem('niver_push_preferences', JSON.stringify(next));
+    if (permission === 'granted' && subscribed) await enable(next);
+  };
+
   if (permission === 'unsupported') return null;
   const active = permission === 'granted' && subscribed;
-  return <section className="glass-card rounded-3xl p-5"><div className="flex items-start gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">{active ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}</div><div className="min-w-0 flex-1"><h2 className="font-display text-lg">Avisos do barco</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">Receba marcações, respostas e fotos novas. É opcional.</p>{active ? <p className="mt-3 text-sm text-emerald-200">Notificações ativadas neste aparelho.</p> : <button type="button" disabled={checking} onClick={() => void enable()} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/20 disabled:cursor-wait disabled:opacity-60">{permission === 'granted' ? <RotateCw className="h-3.5 w-3.5" /> : null}{checking ? 'Verificando…' : permission === 'granted' ? 'Concluir ativação' : 'Ativar notificações'}</button>}{message && <p className="mt-2 text-xs text-muted-foreground">{message}</p>}</div></div></section>;
+  return <section id="notificacoes" className="glass-card rounded-3xl p-5"><div className="flex items-start gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">{active ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}</div><div className="min-w-0 flex-1"><h2 className="font-display text-lg">Avisos do barco</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">Receba apenas o que importa para você.</p>{active ? <><p className="mt-3 text-sm text-emerald-200">Notificações ativadas neste aparelho.</p><div className="mt-3 grid gap-2">{([['mentions','Marcações no mural'],['replies','Respostas e conversas'],['photos','Fotos novas']] as const).map(([key,label])=><label key={key} className="flex min-h-10 items-center justify-between rounded-xl border border-white/10 bg-black/15 px-3 text-sm"><span>{label}</span><input type="checkbox" checked={preferences[key]} onChange={() => void togglePreference(key)} className="h-4 w-4 accent-[#f3c45f]"/></label>)}</div></> : <button type="button" disabled={checking} onClick={() => void enable()} className="premium-cta shimmer mt-3 inline-flex items-center gap-2 rounded-xl border border-[#fff0b4]/60 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] px-4 py-2 text-sm font-semibold text-[#150d05] disabled:cursor-wait disabled:opacity-60">{permission === 'granted' ? <RotateCw className="h-3.5 w-3.5" /> : null}{checking ? 'Verificando…' : permission === 'granted' ? 'Concluir ativação' : 'Ativar notificações'}</button>}{message && <p className="mt-2 text-xs text-muted-foreground">{message}</p>}</div></div></section>;
 }

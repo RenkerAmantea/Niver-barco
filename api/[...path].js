@@ -177,7 +177,7 @@ async function sendPushToGuests(guestIds, payload) {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !guestIds?.length) return { sent: 0, failed: 0 };
   webpush.setVapidDetails('mailto:renker@niver-barco.app', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
   const targetIds = new Set(guestIds);
-  const subscriptions = (await pushSubscriptions()).filter((item) => targetIds.has(item.guestId));
+  const subscriptions = (await pushSubscriptions()).filter((item) => targetIds.has(item.guestId) && (!payload.preference || item.preferences?.[payload.preference] !== false));
   const result = { sent: 0, failed: 0 };
   await Promise.all(subscriptions.map(async (item) => {
     try {
@@ -637,8 +637,8 @@ export default async function handler(req, res) {
       const photo = parsePhotoPost(content);
       const targetIds = photo ? (allGuests ?? []).filter((guest) => guest.id !== guestId).map((guest) => guest.id) : mentionedGuestIds(content, allGuests ?? []).filter((id) => id !== guestId);
       const notification = photo
-        ? { title: 'Nova foto a bordo', body: `${guests?.[0]?.name ?? 'Alguém'} subiu uma foto no convite.`, url: '/fotos', tag: `photo-${posts[0].id}` }
-        : { title: 'Você foi marcado no mural', body: `${guests?.[0]?.name ?? 'Alguém'} te marcou: ${content.slice(0, 120)}`, url: `/forum#post-${posts[0].id}`, tag: `mention-${posts[0].id}` };
+        ? { title: 'Nova foto a bordo', body: `${guests?.[0]?.name ?? 'Alguém'} subiu uma foto no convite.`, url: '/fotos', tag: `photo-${posts[0].id}`, preference: 'photos' }
+        : { title: 'Você foi marcado no mural', body: `${guests?.[0]?.name ?? 'Alguém'} te marcou: ${content.slice(0, 120)}`, url: `/forum#post-${posts[0].id}`, tag: `mention-${posts[0].id}`, preference: 'mentions' };
       await createNotifications(targetIds, notification);
       await sendPushToGuests(targetIds, notification);
       return res.status(201).json(postResponse(posts[0], guests, []));
@@ -675,7 +675,7 @@ export default async function handler(req, res) {
         const [postOwnerResponse, allGuestsResponse] = await Promise.all([rest(`niver_barco_posts?select=guest_id&id=eq.${postId}`), rest('niver_barco_guests?select=id,name')]);
         const [postOwner, allGuests] = await Promise.all([readJson(postOwnerResponse), readJson(allGuestsResponse)]);
         const targetIds = [...new Set([postOwner?.[0]?.guest_id, ...mentionedGuestIds(content, allGuests ?? [])])].filter((id) => id && id !== guestId);
-        const notification = { title: 'Nova resposta no mural', body: `${guests?.[0]?.name ?? 'Alguém'} respondeu: ${content.slice(0, 120)}`, url: `/forum#post-${postId}`, tag: `reply-${replies[0].id}` };
+        const notification = { title: 'Nova resposta no mural', body: `${guests?.[0]?.name ?? 'Alguém'} respondeu: ${content.slice(0, 120)}`, url: `/forum#post-${postId}`, tag: `reply-${replies[0].id}`, preference: 'replies' };
         await createNotifications(targetIds, notification);
         await sendPushToGuests(targetIds, notification);
         return res.status(201).json(replyResponse(replies[0], guests));

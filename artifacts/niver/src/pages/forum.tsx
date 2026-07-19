@@ -165,7 +165,7 @@ export default function Forum() {
                 <Button 
                   type="submit" 
                   disabled={(!content.trim() && !photoUrl) || createPost.isPending || isUploadingPhoto}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-8"
+                  className="premium-cta shimmer border border-[#fff0b4]/60 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] px-8 font-bold text-[#150d05] hover:brightness-110"
                 >
                   {createPost.isPending ? "Publicando..." : "Publicar"}
                 </Button>

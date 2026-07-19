@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useEffect, useState } from 'react';
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
 import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Shield } from "lucide-react";
@@ -6,12 +7,19 @@ import { Button } from "./ui/button";
 import { PresenceCard } from './presence-card';
 import { PwaControls } from './pwa-controls';
 import { NotificationBell } from './notification-bell';
+import { PushControls } from './push-controls';
 import { useGetGuest, GuestRsvpStatus, getGetGuestQueryKey } from '@workspace/api-client-react';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { session, clearSession } = useSession();
   const [location, setLocation] = useLocation();
   const { data: currentGuest } = useGetGuest(session?.id ?? 0, { query: { enabled: !!session?.id, queryKey: getGetGuestQueryKey(session?.id ?? 0) } });
+  const [showPushNudge, setShowPushNudge] = useState(false);
+  useEffect(() => {
+    if (!session || !('Notification' in window) || Notification.permission !== 'default') return;
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
+    if (standalone && !sessionStorage.getItem('niver_push_nudge_seen')) setShowPushNudge(true);
+  }, [session]);
 
   const handleLogout = () => {
     clearSession();
@@ -57,6 +65,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {navLinks.map(({ href, label, icon: Icon, featured }) => <Link key={href} href={href} aria-current={location === href ? 'page' : undefined} className={cn('bottom-nav-item', featured && 'bottom-nav-item-center')}><Icon className="bottom-nav-icon" /> <span className="bottom-nav-label">{label}</span></Link>)}
       </nav>}
       <PwaControls />
+      {showPushNudge && <div className="fixed inset-0 z-[75] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md space-y-3"><PushControls /><button type="button" onClick={() => { sessionStorage.setItem('niver_push_nudge_seen', '1'); setShowPushNudge(false); }} className="mx-auto block px-4 py-2 text-sm text-white/60">Agora não</button></div></div>}
       {session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados' && <div className="fixed inset-0 z-[70] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md"><PresenceCard /></div></div>}
     </div>
   );
