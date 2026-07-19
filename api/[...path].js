@@ -110,6 +110,19 @@ function inviteFromContent(content) {
   } catch { return null; }
 }
 
+function adminMarkerFromContent(content) { return typeof content === 'string' && content === '[[niver-admin]]'; }
+function paymentFromContent(content) {
+  const match = typeof content === 'string' && content.match(/^\[\[niver-payment\]\](.+)$/s);
+  if (!match) return null;
+  try { const payment = JSON.parse(match[1]); return ['pending', 'paid', 'on_site'].includes(payment?.status) ? { status: payment.status, updatedAt: payment.updatedAt ?? null } : null; } catch { return null; }
+}
+function paymentSettingsFromContent(content) {
+  const match = typeof content === 'string' && content.match(/^\[\[niver-payment-settings\]\](.+)$/s);
+  if (!match) return null;
+  try { const settings = JSON.parse(match[1]); return typeof settings?.enabled === 'boolean' ? { enabled: settings.enabled } : null; } catch { return null; }
+}
+function paymentDismissedFromContent(content) { return typeof content === 'string' && content === '[[niver-payment-reminder-dismissed]]'; }
+
 function tokenHash(token) {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -132,12 +145,23 @@ function unclaimedInviteGuestIds(posts) {
 }
 
 function isPrivateMarker(content) {
-  return noteFromContent(content) !== null || replyReactionFromContent(content) !== null || pushSubscriptionFromContent(content) !== null || notificationFromContent(content) !== null || inviteFromContent(content) !== null;
+  return noteFromContent(content) !== null || replyReactionFromContent(content) !== null || pushSubscriptionFromContent(content) !== null || notificationFromContent(content) !== null || inviteFromContent(content) !== null || adminMarkerFromContent(content) || paymentFromContent(content) !== null || paymentSettingsFromContent(content) !== null || paymentDismissedFromContent(content);
 }
 
 function admin(req) {
   return Boolean(ADMIN_PASSWORD) && req.headers.authorization === `Bearer ${ADMIN_PASSWORD}`;
 }
+
+async function inviteAdmin(req) {
+  const token = typeof req.headers['x-niver-admin-invite'] === 'string' ? req.headers['x-niver-admin-invite'] : '';
+  if (token.length < 36) return false;
+  const response = await rest('niver_barco_posts?select=guest_id,content'); const markers = await readJson(response);
+  if (!response.ok) return false;
+  const invite = (markers ?? []).find((item) => inviteFromContent(item.content)?.tokenHash === tokenHash(token));
+  return Boolean(invite && (markers ?? []).some((item) => item.guest_id === invite.guest_id && adminMarkerFromContent(item.content)));
+}
+
+async function authorizedAdmin(req) { return admin(req) || await inviteAdmin(req); }
 
 async function pushSubscriptions() {
   const response = await rest('niver_barco_posts?select=id,guest_id,content');
@@ -297,7 +321,7 @@ export default async function handler(req, res) {
     }
 
     if (path === '/admin/notify') {
-      if (!admin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
       if (req.method !== 'POST') return res.status(405).end();
       const title = typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 80) : '';
       const body = typeof req.body?.body === 'string' ? req.body.body.trim().slice(0, 240) : '';
@@ -314,7 +338,7 @@ export default async function handler(req, res) {
     }
 
     if (path === '/admin/invites') {
-      if (!admin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
       if (req.method === 'GET') {
         const [guestsResponse, markersResponse] = await Promise.all([
           rest('niver_barco_guests?select=id,name,created_at,rsvp_status&order=created_at.desc'),
@@ -370,7 +394,52 @@ export default async function handler(req, res) {
         const claimResponse = await rest(`niver_barco_posts?id=eq.${marker.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ content }) });
         if (!claimResponse.ok) return res.status(claimResponse.status).json(await readJson(claimResponse));
       }
-      return res.status(200).json(guestResponse(guests[0]));
+      const adminMarkerResponse = await rest(`niver_barco_posts?select=content&guest_id=eq.${marker.guest_id}`); const guestMarkers = await readJson(adminMarkerResponse);
+      return res.status(200).json({ ...guestResponse(guests[0]), isAdmin: (guestMarkers ?? []).some((item) => adminMarkerFromContent(item.content)) });
+    }
+
+    if (path === '/admin/payments') {
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      const [guestsResponse, markersResponse] = await Promise.all([rest('niver_barco_guests?select=id,name,rsvp_status,avatar_url&order=created_at.asc'), rest('niver_barco_posts?select=id,guest_id,content,created_at&order=created_at.asc')]);
+      const [guests, markers] = await Promise.all([readJson(guestsResponse), readJson(markersResponse)]);
+      if (!guestsResponse.ok || !markersResponse.ok) return res.status(500).json({ error: 'Não foi possível carregar o controle.' });
+      const hidden = unclaimedInviteGuestIds(markers); const payments = new Map();
+      for (const marker of markers ?? []) { const payment = paymentFromContent(marker.content); if (payment) payments.set(marker.guest_id, payment); }
+      const settingsMarker = [...(markers ?? [])].reverse().find((marker) => paymentSettingsFromContent(marker.content));
+      return res.status(200).json({ guests: (guests ?? []).filter((guest) => !hidden.has(guest.id)).map((guest) => ({ ...guest, payment: payments.get(guest.id)?.status ?? 'pending' })), reminderEnabled: paymentSettingsFromContent(settingsMarker?.content)?.enabled ?? false });
+    }
+
+    const paymentMatch = path.match(/^\/admin\/payments\/(\d+)$/);
+    if (paymentMatch && req.method === 'PATCH') {
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      const guestId = Number(paymentMatch[1]); const status = req.body?.status;
+      if (!Number.isInteger(guestId) || !['pending', 'paid', 'on_site'].includes(status)) return res.status(400).json({ error: 'Status inválido.' });
+      const oldResponse = await rest(`niver_barco_posts?select=id,content&guest_id=eq.${guestId}`); const old = await readJson(oldResponse);
+      for (const marker of old ?? []) if (paymentFromContent(marker.content)) await rest(`niver_barco_posts?id=eq.${marker.id}`, { method: 'DELETE' });
+      const response = await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: guestId, content: `[[niver-payment]]${JSON.stringify({ status, updatedAt: new Date().toISOString() })}` }) });
+      return response.ok ? res.status(200).json({ ok: true, status }) : res.status(response.status).json(await readJson(response));
+    }
+
+    if (path === '/admin/surprise-guests' && req.method === 'POST') {
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      const name = typeof req.body?.name === 'string' ? req.body.name.trim().replace(/\s+/g, ' ') : ''; const payment = req.body?.payment ?? 'pending';
+      if (!name || !['pending', 'paid', 'on_site'].includes(payment)) return res.status(400).json({ error: 'Dados inválidos.' });
+      const namesResponse = await rest('niver_barco_guests?select=id,name'); const names = await readJson(namesResponse);
+      if ((names ?? []).some((guest) => normalizedName(guest.name) === normalizedName(name))) return res.status(409).json({ error: 'Esse nome já está em uso.' });
+      const createResponse = await rest('niver_barco_guests', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, rsvp_status: 'going' }) }); const created = await readJson(createResponse); const guest = created?.[0];
+      if (!createResponse.ok || !guest) return res.status(createResponse.status).json(created);
+      await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: guest.id, content: `[[niver-payment]]${JSON.stringify({ status: payment, updatedAt: new Date().toISOString() })}` }) });
+      return res.status(201).json({ ...guest, payment });
+    }
+
+    if (path === '/admin/payment-reminder' && req.method === 'PATCH') {
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      if (typeof req.body?.enabled !== 'boolean') return res.status(400).json({ error: 'Configuração inválida.' });
+      const ownerId = Number(req.body?.guestId); if (!Number.isInteger(ownerId)) return res.status(400).json({ error: 'Conta administrativa inválida.' });
+      const oldResponse = await rest('niver_barco_posts?select=id,content'); const old = await readJson(oldResponse);
+      for (const marker of old ?? []) if (paymentSettingsFromContent(marker.content)) await rest(`niver_barco_posts?id=eq.${marker.id}`, { method: 'DELETE' });
+      const response = await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: ownerId, content: `[[niver-payment-settings]]${JSON.stringify({ enabled: req.body.enabled })}` }) });
+      return response.ok ? res.status(200).json({ ok: true, enabled: req.body.enabled }) : res.status(response.status).json(await readJson(response));
     }
 
     if (req.method === 'GET' && path === '/photos') {

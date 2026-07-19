@@ -4,6 +4,8 @@ export interface GuestSession {
   id: number;
   name: string;
   avatarUrl?: string | null;
+  isAdmin?: boolean;
+  adminToken?: string;
 }
 
 const SESSION_KEY = 'niver_session';

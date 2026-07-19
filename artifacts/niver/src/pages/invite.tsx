@@ -18,7 +18,7 @@ export default function Invite() {
       .then(({ response, data }) => {
         if (!active) return;
         if (!response.ok) throw new Error(data?.error || 'Este convite não está disponível.');
-        saveSession({ id: data.id, name: data.name, avatarUrl: data.avatarUrl });
+        saveSession({ id: data.id, name: data.name, avatarUrl: data.avatarUrl, isAdmin: Boolean(data.isAdmin), adminToken: data.isAdmin ? token : undefined });
         setLocation('/evento');
       })
       .catch((reason: Error) => active && setError(reason.message || 'Não foi possível abrir este convite.'));

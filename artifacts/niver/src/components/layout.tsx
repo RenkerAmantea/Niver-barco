@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
-import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound } from "lucide-react";
+import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Shield } from "lucide-react";
 import { Button } from "./ui/button";
 import { PresenceCard } from './presence-card';
 import { PwaControls } from './pwa-controls';
@@ -39,7 +39,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           {session && (
-            <div className="flex items-center gap-2"><NotificationBell /><Button variant="ghost" size="icon" onClick={handleLogout} title="Sair" className="h-10 w-10 cursor-pointer rounded-xl border border-white/[.07] bg-white/[.035] hover:bg-white/[.08]">
+            <div className="flex items-center gap-1"><NotificationBell />{session.isAdmin && <Button variant="ghost" size="icon" onClick={() => setLocation('/admin')} title="Administração" className="h-10 w-8 cursor-pointer text-primary hover:bg-transparent"><Shield className="h-4 w-4" /></Button>}<Button variant="ghost" size="icon" onClick={handleLogout} title="Sair" className="h-10 w-8 cursor-pointer rounded-xl border-0 bg-transparent hover:bg-transparent">
               <LogOut className="h-4 w-4 text-white/60 transition-colors hover:text-[#ffb0b0]" />
             </Button></div>
           )}
