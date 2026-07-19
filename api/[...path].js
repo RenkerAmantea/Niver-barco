@@ -398,6 +398,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ...guestResponse(guests[0]), isAdmin: (guestMarkers ?? []).some((item) => adminMarkerFromContent(item.content)) });
     }
 
+
     if (path === '/admin/payments') {
       if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
       const [guestsResponse, markersResponse] = await Promise.all([rest('niver_barco_guests?select=id,name,rsvp_status,avatar_url&order=created_at.asc'), rest('niver_barco_posts?select=id,guest_id,content,created_at&order=created_at.asc')]);
