@@ -46,22 +46,20 @@ export function PushControls() {
       setPermission(nextPermission);
       if (nextPermission !== 'granted') { setSubscribed(false); setMessage('Você pode ativar depois nas permissões do navegador.'); return; }
       const registration = await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
-      try {
-        subscription = subscription ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) });
-      } catch (error) {
-        // An older deployed version may have registered a subscription with another VAPID key.
-        if (!subscription) throw error;
-        await subscription.unsubscribe();
-        subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) });
-      }
+      const previousSubscription = await registration.pushManager.getSubscription();
+      // A VAPID rotation changes the application-server key. Reusing an old
+      // browser subscription can fail silently or keep sending to the old key.
+      if (previousSubscription) await previousSubscription.unsubscribe();
+      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) });
       const response = await fetch('/api/push/subscriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, subscription, preferences: nextPreferences }) });
       if (!response.ok) throw new Error('Não foi possível salvar a inscrição deste aparelho.');
       setSubscribed(true);
       setMessage('Pronto: este aparelho receberá avisos do barco.');
     } catch (error) {
       setSubscribed(false);
-      setMessage(error instanceof Error ? error.message : 'Não foi possível ativar agora.');
+      const rawMessage = error instanceof Error ? error.message : '';
+      const isApple = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      setMessage(isApple && /push service|registration failed/i.test(rawMessage) ? 'No iPhone, abra o convite pelo ícone instalado na Tela de Início (não pelo Safari/Telegram) e tente de novo.' : (rawMessage || 'Não foi possível ativar agora.'));
     } finally { setChecking(false); }
   };
 
