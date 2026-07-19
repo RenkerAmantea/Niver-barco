@@ -18,13 +18,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Anchor, CornerDownRight, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Send, Sparkles, X } from "lucide-react";
+import { Anchor, BadgeCheck, CornerDownRight, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Send, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const reactionOptions = [
-  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/20 text-pink-200', iconClass: 'text-pink-300' },
-  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'border-orange-300/55 bg-orange-500/20 text-orange-200', iconClass: 'text-orange-300' },
-  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'border-sky-300/55 bg-sky-500/20 text-sky-200', iconClass: 'text-sky-300' },
+  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/30 text-pink-100', iconClass: 'fill-pink-400 text-pink-200' },
+  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'border-orange-300/55 bg-orange-500/30 text-orange-100', iconClass: 'fill-orange-400 text-orange-100' },
+  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'border-sky-300/55 bg-sky-500/30 text-sky-100', iconClass: 'text-sky-100' },
   { key: 'party', label: 'Brilho', icon: Sparkles, activeClass: 'border-violet-300/55 bg-violet-500/20 text-violet-200', iconClass: 'text-violet-200' },
 ];
 
@@ -59,7 +59,7 @@ function ReactionBar({ postId }: { postId: number }) {
   };
   return <div className="flex flex-wrap gap-2 pt-3">{reactionOptions.map(({ key, label, icon: Icon, activeClass, iconClass }) => {
     const active = reactions[key]?.reacted;
-    return <button key={key} type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className={cn("reaction-chip reaction-icon-chip cursor-pointer", active && activeClass, burst === key && "reaction-burst")}><Icon className={cn("h-4 w-4", iconClass, active && key === 'heart' && 'fill-current')} />{reactions[key]?.count > 0 && <span>{reactions[key].count}</span>}</button>;
+    return <button key={key} type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className={cn("reaction-chip reaction-icon-chip cursor-pointer", active && activeClass, burst === key && "reaction-burst")}><Icon className={cn("h-4 w-4", iconClass, active && key === 'party' && 'fill-current')} />{reactions[key]?.count > 0 && <span>{reactions[key].count}</span>}</button>;
   })}</div>;
 }
 
@@ -300,7 +300,7 @@ export default function Forum() {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between mb-2">
-                      <h4 className="font-medium text-foreground text-base truncate pr-4">{post.guestName}</h4>
+                      <div className="flex min-w-0 items-center gap-2"><h4 className="font-medium text-foreground text-base truncate">{post.guestName}</h4>{(() => { const status = (post as Post & { rsvpStatus?: string }).rsvpStatus; const tag = status === 'going' ? ['Vou', 'bg-emerald-500/18 text-emerald-200 border-emerald-300/30'] : status === 'maybe' ? ['Talvez', 'bg-amber-500/18 text-amber-100 border-amber-300/30'] : status === 'not_going' ? ['Não vou', 'bg-red-500/18 text-red-100 border-red-300/30'] : null; return tag && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${tag[1]}`}>{tag[0]}</span>; })()}</div>
                       <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
                         {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ptBR })}
                       </span>

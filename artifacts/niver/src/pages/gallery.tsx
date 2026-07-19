@@ -1,6 +1,6 @@
 import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
-import { Camera, ImagePlus, LoaderCircle, UploadCloud } from 'lucide-react';
+import { Camera, ImagePlus, LoaderCircle, UploadCloud, X } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 
 type Photo = {
@@ -23,6 +23,7 @@ export default function Gallery() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Photo | null>(null);
 
   const loadPhotos = async () => {
     setIsLoading(true);
@@ -106,11 +107,12 @@ export default function Gallery() {
         <div className="gallery-grid mt-6" aria-label="Carregando fotos">{[1, 2, 3, 4].map((item) => <div key={item} className="gallery-skeleton animate-pulse" />)}</div>
       ) : photos.length ? (
         <div className="gallery-grid mt-6">
-          {photos.map((photo) => <figure key={photo.id} className="gallery-photo"><img src={photo.url} alt={`Foto enviada por ${photo.guestName}`} loading="lazy" /><figcaption><span>{photo.guestName}</span></figcaption></figure>)}
+          {photos.map((photo) => <button key={photo.id} type="button" onClick={() => setSelected(photo)} className="gallery-photo cursor-zoom-in text-left"><img src={photo.url} alt={`Foto enviada por ${photo.guestName}`} loading="lazy" /><figcaption><span>{photo.guestName}</span></figcaption></button>)}
         </div>
       ) : (
         <div className="gallery-empty mt-6"><Camera className="mx-auto h-10 w-10 text-primary" /><h2>O convés ainda está sem flagrantes.</h2><p>Inaugura a galeria. A primeira foto pode ser sua.</p></div>
       )}
+      {selected && <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Foto ampliada" onClick={() => setSelected(null)}><div className="relative max-h-full w-full max-w-xl overflow-auto rounded-3xl border border-white/15 bg-[#101126] p-3" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setSelected(null)} className="absolute right-5 top-5 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/65 text-white"><X className="h-5 w-5" /></button><img src={selected.url} alt={`Foto enviada por ${selected.guestName}`} className="max-h-[68vh] w-full rounded-2xl object-contain" /><div className="p-3"><p className="font-display text-lg text-foreground">{selected.guestName}</p><p className="mt-1 text-sm text-muted-foreground">Foto enviada direto para o álbum.</p></div></div></div>}
     </div>
   );
 }

@@ -70,6 +70,7 @@ function postResponse(post, guests, replies) {
     guestId: post.guest_id,
     guestName: guest?.name ?? 'Convidado',
     guestAvatarUrl: guest?.avatar_url ?? null,
+    rsvpStatus: guest?.rsvp_status ?? 'pending',
     content: post.content,
     replyCount: replies.filter((reply) => reply.post_id === post.id).length,
     createdAt: post.created_at,
