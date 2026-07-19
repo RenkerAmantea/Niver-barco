@@ -286,7 +286,8 @@ export default async function handler(req, res) {
       if (!Number.isInteger(guestId) || !subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) return res.status(400).json({ error: 'Inscrição de push inválida.' });
       const old = await rest('niver_barco_posts?select=id,content'); const markers = await readJson(old);
       for (const marker of markers ?? []) { const item = pushSubscriptionFromContent(marker.content); if (item?.endpoint === subscription.endpoint) await rest(`niver_barco_posts?id=eq.${marker.id}`, { method: 'DELETE' }); }
-      const response = await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: guestId, content: `[[niver-push-subscription]]${JSON.stringify({ subscription, preferences: req.body?.preferences ?? { replies: true, mentions: true, photos: true } })}` }) });
+      const preferences = { announcements: true, mentions: true, replies: true, photos: true, ...(req.body?.preferences ?? {}) };
+      const response = await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: guestId, content: `[[niver-push-subscription]]${JSON.stringify({ subscription, preferences })}` }) });
       return response.ok ? res.status(201).json({ ok: true }) : res.status(response.status).json(await readJson(response));
     }
 
@@ -333,7 +334,7 @@ export default async function handler(req, res) {
       const guestIds = (guests ?? []).map((guest) => guest.id);
       const saved = await createNotifications(guestIds, { title, body, url });
       const records = await pushSubscriptions();
-      const outcome = await sendPushToGuests([...new Set(records.map((item) => item.guestId))], { title, body, url, tag: `admin-${Date.now()}` });
+      const outcome = await sendPushToGuests([...new Set(records.map((item) => item.guestId))], { title, body, url, tag: `admin-${Date.now()}`, preference: 'announcements' });
       return res.status(200).json({ ...outcome, saved, subscribedDevices: records.length });
     }
 
