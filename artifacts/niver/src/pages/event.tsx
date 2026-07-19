@@ -27,7 +27,7 @@ export default function Event() {
     <section className="relative overflow-hidden rounded-[2rem] border border-primary/25 bg-gradient-to-br from-[#20143f] via-[#11152e] to-[#071622] p-7 shadow-[0_0_50px_rgba(124,58,237,.18)]">
       <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
       <p className="text-xs uppercase tracking-[.2em] text-primary">21 JUL · BRASÍLIA</p>
-      <h1 className="mt-3 max-w-sm text-4xl font-display font-bold leading-none text-white">Renker<br/><span className="text-primary">Niver Barco</span></h1>
+      <h1 className="mt-3 max-w-sm text-4xl font-display font-bold leading-none text-white">Renker<br/><span className="text-primary">Niver a bordo</span></h1>
       <p className="mt-5 max-w-md text-sm leading-6 text-white/70">Uma resenha pequena, um barco e uma comemoração simples. A grande Renker Party fica para mais pra frente. Esta é só a nossa resenha no convés.</p>
       <div className="mt-7 grid grid-cols-3 gap-2 text-center text-xs text-white/75"><div className="rounded-2xl bg-black/20 p-3"><CalendarDays className="mx-auto mb-2 h-4 w-4 text-primary"/>Terça<br/>19h</div><div className="rounded-2xl bg-black/20 p-3"><ShipWheel className="mx-auto mb-2 h-4 w-4 text-primary"/>Barco<br/>atracado</div><div className="rounded-2xl bg-black/20 p-3"><MapPin className="mx-auto mb-2 h-4 w-4 text-primary"/>Brasília<br/>DF</div></div>
     </section>

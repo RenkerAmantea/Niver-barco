@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
-import { useGetRsvpSummary, useCreateGuest } from "@workspace/api-client-react";
+import { useCreateGuest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, HelpCircle, XCircle, ArrowRight, Sparkles, X } from "lucide-react";
+import { ArrowRight, Sparkles, X } from "lucide-react";
 import { avatarAccents, avatarOptions, makeAvatar } from '@/lib/avatar-options';
 
 export default function Landing() {
@@ -15,7 +15,6 @@ export default function Landing() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [entryError, setEntryError] = useState<string | null>(null);
 
-  const { data: summary, isLoading: isLoadingSummary } = useGetRsvpSummary();
   const createGuest = useCreateGuest();
 
   useEffect(() => {
@@ -59,7 +58,7 @@ export default function Landing() {
       <div className="relative mx-auto mb-10 max-w-2xl space-y-5 text-center md:mb-14">
         <div className="hero-kicker shimmer inline-flex items-center gap-2 rounded-full border border-[#f3c45f]/40 bg-[#2a1a05]/55 px-4 py-2 text-[10px] font-semibold uppercase text-[#ffe39a] backdrop-blur-xl"><Sparkles className="h-3.5 w-3.5" /> convite vip</div>
         <h1 className="pb-1 text-5xl font-display font-bold leading-[.88] tracking-[-.06em] text-transparent bg-clip-text bg-gradient-to-br from-[#fff5dc] via-[#f3cf86] to-[#bd8038] md:text-7xl">
-          Renker<br/><span className="bg-gradient-to-r from-[#ff53bc] to-[#a368ff] bg-clip-text text-transparent">Niver Barco</span>
+          Renker<br/><span className="bg-gradient-to-r from-[#ff53bc] to-[#a368ff] bg-clip-text text-transparent">Niver a bordo</span>
         </h1>
         <p className="event-signature">terça-feira · 21 de julho · 19h</p>
         <p className="mx-auto max-w-md text-base leading-7 text-white/78 md:text-lg">Uma resenha pequena, um barco e uma comemoração simples. A grande Renker Party fica para mais pra frente.</p>
@@ -105,32 +104,6 @@ export default function Landing() {
           </div>}
         </CardContent>
       </Card>
-
-      {/* RSVP Stats */}
-      <div className="grid w-full max-w-2xl grid-cols-3 gap-3 opacity-95 md:gap-5">
-        <div className="stat-glass flex flex-col items-center justify-center space-y-2 rounded-2xl border border-white/10 bg-[#0b1026]/50 p-4 backdrop-blur-xl">
-          <CheckCircle2 className="h-8 w-8 text-primary" />
-          <span className="text-3xl font-display font-bold text-foreground">
-            {isLoadingSummary ? "-" : summary?.going ?? 0}
-          </span>
-          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Confirmados</span>
-        </div>
-        <div className="stat-glass flex flex-col items-center justify-center space-y-2 rounded-2xl border border-white/10 bg-[#0b1026]/50 p-4 backdrop-blur-xl">
-          <HelpCircle className="h-8 w-8 text-foreground/50" />
-          <span className="text-3xl font-display font-bold text-foreground">
-            {isLoadingSummary ? "-" : summary?.maybe ?? 0}
-          </span>
-          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Talvez</span>
-        </div>
-        <div className="stat-glass flex flex-col items-center justify-center space-y-2 rounded-2xl border border-white/10 bg-[#0b1026]/50 p-4 backdrop-blur-xl">
-          <XCircle className="h-8 w-8 text-destructive/70" />
-          <span className="text-3xl font-display font-bold text-foreground">
-            {isLoadingSummary ? "-" : summary?.notGoing ?? 0}
-          </span>
-          <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Não Vão</span>
-        </div>
-      </div>
-
     </div>
   );
 }

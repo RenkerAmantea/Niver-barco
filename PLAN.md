@@ -1,10 +1,10 @@
-# Plano: Perfis por aparelho — Niver Barco
+# Plano: Ajustes de lançamento — Niver Barco
 
 > Criado em 2026-07-19. Status: execução.
 
 ## Objetivo
 
-Permitir que mais de uma pessoa use o mesmo aparelho sem perder o acesso aos perfis já criados, mantendo o login simples do evento.
+Concluir ajustes de lançamento do convite: perfis locais, identidade “Renker Niver a bordo”, URL final e limpeza segura dos dados de teste, preservando a conta administrativa.
 
 ## Sucesso =
 
@@ -40,4 +40,25 @@ Permitir que mais de uma pessoa use o mesmo aparelho sem perder o acesso aos per
 
 ## Estado atual
 
-Concluído. QA em produção confirmou: lista com dois perfis, entrada em um perfil, logout preservando ambos e remoção local de somente um atalho. `pnpm typecheck`, `pnpm build` e HTTP 200 passaram.
+Perfis locais concluídos. Nova fase em andamento.
+
+### Fase 3: Fechamento de lançamento
+
+- [x] **T3.1** — Trocar os títulos das telas de entrada e evento para “Renker Niver a bordo” e remover os contadores da entrada.
+  - Verificação: título novo aparece nas duas telas e cabe em 390px.
+  - Estimativa: 10 min
+  - Depende de: nenhuma
+
+- [x] **T3.2** — Limpar conteúdo de teste com preservação comprovada do perfil e credenciais admin.
+  - Verificação: fica só a conta admin e seus dois marcadores internos; posts, reações, respostas, inscrições push, avisos e fotos de teste ficam zerados.
+  - Estimativa: 30 min
+  - Depende de: T3.1
+
+- [x] **T3.3** — Renomear a URL de produção para `renker-niver-barco.vercel.app` e validar os dois endereços.
+  - Verificação: novo domínio responde 200; endereço antigo continua compatível e também responde 200.
+  - Estimativa: 10 min
+  - Depende de: T3.2
+
+## Estado final
+
+Fase 3 concluída. Produção limpa, perfil administrativo Renker preservado e novo endereço público validado.
