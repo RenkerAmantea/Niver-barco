@@ -63,6 +63,7 @@ export default function Guests() {
             </Avatar>
             <div>
               <p className="font-medium text-foreground">{guest.name}</p>
+              {guest.rsvpStatus === GuestRsvpStatus.not_going && (guest as Guest & { rsvpNote?: string | null }).rsvpNote && <p className="mt-1 max-w-md text-sm leading-5 text-muted-foreground">“{(guest as Guest & { rsvpNote?: string }).rsvpNote}”</p>}
               {guest.id === session.id && (
                 <span className="text-xs text-primary font-medium tracking-wide uppercase">Você</span>
               )}

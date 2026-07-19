@@ -59,13 +59,28 @@ async function readJson(response) {
   return text ? JSON.parse(text) : null;
 }
 
-function guestResponse(guest) {
+function noteFromContent(content) {
+  const match = typeof content === 'string' && content.match(/^\[\[niver-rsvp-note\]\]([\s\S]*)$/);
+  return match ? match[1].trim() : null;
+}
+
+function rsvpNotes(posts) {
+  const notes = new Map();
+  for (const post of posts ?? []) {
+    const note = noteFromContent(post.content);
+    if (note !== null) notes.set(post.guest_id, note);
+  }
+  return notes;
+}
+
+function guestResponse(guest, notes = new Map()) {
   return {
     id: guest.id,
     name: guest.name,
     googleId: guest.google_id,
     avatarUrl: guest.avatar_url,
     rsvpStatus: guest.rsvp_status,
+    rsvpNote: notes.get(guest.id) ?? null,
     createdAt: guest.created_at,
   };
 }
@@ -188,9 +203,11 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET' && path === '/guests') {
-      const response = await rest('niver_barco_guests?select=*&order=created_at.asc');
-      const guests = await readJson(response);
-      return res.status(response.status).json(Array.isArray(guests) ? guests.map(guestResponse) : guests);
+      const [response, notesResponse] = await Promise.all([rest('niver_barco_guests?select=*&order=created_at.asc'), rest('niver_barco_posts?select=guest_id,content,created_at&order=created_at.asc')]);
+      const [guests, posts] = await Promise.all([readJson(response), readJson(notesResponse)]);
+      if (!notesResponse.ok) return res.status(notesResponse.status).json(posts);
+      const notes = rsvpNotes(posts);
+      return res.status(response.status).json(Array.isArray(guests) ? guests.map((guest) => guestResponse(guest, notes)) : guests);
     }
 
     if (req.method === 'POST' && path === '/guests') {
@@ -209,20 +226,27 @@ export default async function handler(req, res) {
     if (guestMatch) {
       const guestId = Number(guestMatch[1]);
       if (req.method === 'GET') {
-        const response = await rest(`niver_barco_guests?select=*&id=eq.${guestId}`);
-        const guests = await readJson(response);
-        return guests?.[0] ? res.status(200).json(guestResponse(guests[0])) : res.status(404).json({ error: 'Guest not found' });
+        const [response, notesResponse] = await Promise.all([rest(`niver_barco_guests?select=*&id=eq.${guestId}`), rest(`niver_barco_posts?select=guest_id,content,created_at&guest_id=eq.${guestId}&order=created_at.asc`)]);
+        const [guests, posts] = await Promise.all([readJson(response), readJson(notesResponse)]);
+        if (!notesResponse.ok) return res.status(notesResponse.status).json(posts);
+        return guests?.[0] ? res.status(200).json(guestResponse(guests[0], rsvpNotes(posts))) : res.status(404).json({ error: 'Guest not found' });
       }
       if (req.method === 'PATCH' && path.endsWith('/rsvp')) {
         const allowed = new Set(['going', 'maybe', 'not_going', 'pending']);
         if (!allowed.has(req.body?.rsvpStatus)) return res.status(400).json({ error: 'Invalid RSVP status' });
+        const note = typeof req.body?.rsvpNote === 'string' ? req.body.rsvpNote.trim().slice(0, 220) : null;
         const response = await rest(`niver_barco_guests?id=eq.${guestId}`, {
           method: 'PATCH',
           headers: { Prefer: 'return=representation' },
           body: JSON.stringify({ rsvp_status: req.body.rsvpStatus }),
         });
         const guests = await readJson(response);
-        return guests?.[0] ? res.status(200).json(guestResponse(guests[0])) : res.status(404).json({ error: 'Guest not found' });
+        if (!guests?.[0]) return res.status(404).json({ error: 'Guest not found' });
+        if (req.body.rsvpStatus === 'not_going' && note !== null) {
+          const noteResponse = await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: guestId, content: `[[niver-rsvp-note]]${note}` }) });
+          if (!noteResponse.ok) return res.status(noteResponse.status).json(await readJson(noteResponse));
+        }
+        return res.status(200).json(guestResponse(guests[0], new Map(note !== null ? [[guestId, note]] : [])));
       }
     }
 
@@ -262,7 +286,7 @@ export default async function handler(req, res) {
         readJson(repliesResponse),
       ]);
       if (!postsResponse.ok) return res.status(postsResponse.status).json(posts);
-      return res.status(200).json(posts.map((post) => postResponse(post, guests, replies)));
+      return res.status(200).json(posts.filter((post) => noteFromContent(post.content) === null).map((post) => postResponse(post, guests, replies)));
     }
 
     if (req.method === 'POST' && path === '/posts') {
