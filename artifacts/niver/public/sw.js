@@ -1,4 +1,4 @@
-const CACHE = 'niver-barco-shell-v5';
+const CACHE = 'niver-barco-shell-v6';
 const SHELL = [
   '/',
   '/evento',
