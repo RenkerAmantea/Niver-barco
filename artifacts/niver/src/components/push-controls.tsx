@@ -7,7 +7,8 @@ const defaultPreferences = { announcements: true, mentions: true, replies: true,
 type PreferenceKey = keyof typeof defaultPreferences;
 
 function keyToUint8Array(base64: string) {
-  const raw = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+  const normalized = base64.replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '='));
   return Uint8Array.from(raw, char => char.charCodeAt(0));
 }
 
@@ -57,7 +58,21 @@ export function PushControls() {
       // A VAPID rotation changes the application-server key. Reusing an old
       // browser subscription can fail silently or keep sending to the old key.
       if (previousSubscription) await previousSubscription.unsubscribe();
-      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) });
+      const options = { userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) };
+      let subscription: PushSubscription;
+      try {
+        subscription = await registration.pushManager.subscribe(options);
+      } catch (firstError) {
+        // Android/Chrome can retain a broken worker after an app/domain update.
+        // Re-register once before reporting a browser push-service error.
+        const message = firstError instanceof Error ? firstError.message : '';
+        if (!/push service|registration failed|abort/i.test(message)) throw firstError;
+        await registration.unregister();
+        const freshRegistration = await navigator.serviceWorker.register('/sw.js');
+        await freshRegistration.update();
+        const activeRegistration = await navigator.serviceWorker.ready;
+        subscription = await activeRegistration.pushManager.subscribe(options);
+      }
       const response = await fetch('/api/push/subscriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, subscription, preferences: nextPreferences }) });
       if (!response.ok) throw new Error('Não foi possível salvar a inscrição deste aparelho.');
       setSubscribed(true);
@@ -66,7 +81,8 @@ export function PushControls() {
       setSubscribed(false);
       const rawMessage = error instanceof Error ? error.message : '';
       const isApple = isIOS;
-      setMessage(isApple && /push service|registration failed/i.test(rawMessage) ? 'No iPhone, abra o convite pelo ícone instalado na Tela de Início (não pelo Safari/Telegram) e tente de novo.' : (rawMessage || 'Não foi possível ativar agora.'));
+      const isPushServiceError = /push service|registration failed/i.test(rawMessage);
+      setMessage(isApple && isPushServiceError ? 'No iPhone, abra o convite pelo ícone instalado na Tela de Início (não pelo Safari/Telegram) e tente de novo.' : (!isApple && isPushServiceError ? 'O Chrome não conseguiu falar com o serviço de push. Abra o convite pelo Google Chrome (não Telegram/Mi Browser), confira se o Chrome e o Google Play Services estão atualizados e tente de novo.' : (rawMessage || 'Não foi possível ativar agora.')));
     } finally { setChecking(false); }
   };
 
