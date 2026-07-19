@@ -12,6 +12,14 @@ function keyToUint8Array(base64: string) {
   return Uint8Array.from(raw, char => char.charCodeAt(0));
 }
 
+function sameApplicationServerKey(subscription: PushSubscription, publicKey: string) {
+  const currentKey = subscription.options.applicationServerKey;
+  if (!currentKey) return false;
+  const expected = keyToUint8Array(publicKey);
+  const current = new Uint8Array(currentKey);
+  return current.length === expected.length && current.every((value, index) => value === expected[index]);
+}
+
 export function PushControls() {
   const { session } = useSession();
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
@@ -55,14 +63,18 @@ export function PushControls() {
       if (nextPermission !== 'granted') { setSubscribed(false); setMessage('Você pode ativar depois nas permissões do navegador.'); return; }
       const registration = await navigator.serviceWorker.ready;
       const previousSubscription = await registration.pushManager.getSubscription();
-      // A VAPID rotation changes the application-server key. Reusing an old
-      // browser subscription can fail silently or keep sending to the old key.
-      if (previousSubscription) await previousSubscription.unsubscribe();
       const options = { userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) };
       let subscription: PushSubscription;
-      try {
-        subscription = await registration.pushManager.subscribe(options);
-      } catch (firstError) {
+      // Do not unsubscribe a healthy Chrome subscription on every tap. On
+      // Android that immediate unsubscribe/subscribe cycle can itself trigger
+      // "Registration failed - push service error" after a domain update.
+      if (previousSubscription && sameApplicationServerKey(previousSubscription, config.publicKey)) {
+        subscription = previousSubscription;
+      } else {
+        if (previousSubscription) await previousSubscription.unsubscribe();
+        try {
+          subscription = await registration.pushManager.subscribe(options);
+        } catch (firstError) {
         // Android/Chrome can retain a broken worker after an app/domain update.
         // Re-register once before reporting a browser push-service error.
         const message = firstError instanceof Error ? firstError.message : '';
@@ -71,7 +83,8 @@ export function PushControls() {
         const freshRegistration = await navigator.serviceWorker.register('/sw.js');
         await freshRegistration.update();
         const activeRegistration = await navigator.serviceWorker.ready;
-        subscription = await activeRegistration.pushManager.subscribe(options);
+          subscription = await activeRegistration.pushManager.subscribe(options);
+        }
       }
       const response = await fetch('/api/push/subscriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, subscription, preferences: nextPreferences }) });
       if (!response.ok) throw new Error('Não foi possível salvar a inscrição deste aparelho.');
