@@ -61,7 +61,7 @@ export function NotificationBell() {
   };
 
   return <div ref={panelRef} className="relative">
-    <button type="button" onClick={() => { setOpen((value) => !value); void refresh(); }} aria-label={unreadCount ? `${unreadCount} notificações não lidas` : 'Abrir notificações'} aria-expanded={open} className="relative grid h-10 w-10 cursor-pointer place-items-center rounded-xl border border-white/[.07] bg-white/[.035] text-white/70 transition-colors hover:bg-white/[.08] hover:text-[#f9d98a]">
+    <button type="button" onClick={() => { setOpen((value) => !value); void refresh(); }} aria-label={unreadCount ? `${unreadCount} notificações não lidas` : 'Abrir notificações'} aria-expanded={open} className="relative grid h-10 w-10 cursor-pointer place-items-center text-white/70 transition-colors hover:text-[#f9d98a]">
       <Bell className="h-4 w-4" />
       {unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid min-w-4 h-4 place-items-center rounded-full border border-[#0a0c1d] bg-[#ef5350] px-1 text-[9px] font-bold leading-none text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
     </button>
