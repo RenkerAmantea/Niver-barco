@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, createECDH, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -172,6 +172,17 @@ function tokenHash(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
+function vapidPairMatches() {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return false;
+  try {
+    const ecdh = createECDH('prime256v1');
+    ecdh.setPrivateKey(Buffer.from(VAPID_PRIVATE_KEY, 'base64url'));
+    const derivedPublic = ecdh.getPublicKey();
+    const configuredPublic = Buffer.from(VAPID_PUBLIC_KEY, 'base64url');
+    return derivedPublic.length === configuredPublic.length && timingSafeEqual(derivedPublic, configuredPublic);
+  } catch { return false; }
+}
+
 function inviteSlug(name) {
   const result = normalizedName(name)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -323,6 +334,16 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' && path === '/push/config') {
       return res.status(200).json({ supported: Boolean(VAPID_PUBLIC_KEY), publicKey: VAPID_PUBLIC_KEY ?? null });
+    }
+
+    if (req.method === 'GET' && path === '/push/health') {
+      // Diagnóstico sem segredos: permite confirmar que o par VAPID do
+      // servidor é coerente antes de culpar o aparelho do convidado.
+      return res.status(200).json({
+        configured: Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY),
+        pairMatches: vapidPairMatches(),
+        publicKeyFingerprint: VAPID_PUBLIC_KEY ? createHash('sha256').update(VAPID_PUBLIC_KEY).digest('hex').slice(0, 12) : null,
+      });
     }
 
     if (req.method === 'POST' && path === '/push/subscriptions') {
