@@ -80,16 +80,16 @@ Fase 4 concluída. Os aliases `renker-niver-barco` e `niver-barco` estão no mes
 
 ### Fase 5: Usabilidade dos convites individuais
 
-- [~] **T5.1** — Exibir o link recém-gerado inteiro em um campo acessível e permitir copiá-lo por um botão explícito.
+- [x] **T5.1** — Exibir o link recém-gerado inteiro em um campo acessível e permitir copiá-lo por um botão explícito.
   - Verificação: após gerar, o URL não é truncado e o botão copia o valor com feedback de sucesso/erro.
   - Estimativa: 10 min
   - Depende de: nenhuma
 
-- [ ] **T5.2** — Rodar typecheck/build e inspeção visual mobile do card de convite.
+- [x] **T5.2** — Rodar typecheck/build e inspeção visual mobile do card de convite.
   - Verificação: painel continua responsivo em 390px; não há rolagem horizontal nem erro de console.
   - Estimativa: 10 min
   - Depende de: T5.1
 
 ## Estado atual
 
-Fase 5 em execução: melhorar a cópia explícita do link recém-gerado no painel administrativo.
+Fase 5 concluída. O painel agora preserva o URL completo em campo selecionável, com ação explícita de cópia e feedback. Typecheck/build do app passaram; QA em produção confirmou o painel administrativo em viewport 390px, sem erros de console. Os dois aliases foram conferidos com cache-buster e retornam o mesmo bundle `index-BuW1lMCr.js`.
