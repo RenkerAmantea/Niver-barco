@@ -126,6 +126,10 @@ function inviteFromContent(content) {
 }
 
 function adminMarkerFromContent(content) { return typeof content === 'string' && content === '[[niver-admin]]'; }
+function isCaptainGuest(guestId, markers = []) {
+  return Number(process.env.NIVER_CAPTAIN_GUEST_ID) === Number(guestId)
+    || markers.some((marker) => marker.guest_id === guestId && adminMarkerFromContent(marker.content));
+}
 function paymentFromContent(content) {
   const match = typeof content === 'string' && content.match(/^\[\[niver-payment\]\](.+)$/s);
   if (!match) return null;
@@ -423,7 +427,7 @@ export default async function handler(req, res) {
       const hidden = unclaimedInviteGuestIds(markers); const payments = new Map();
       for (const marker of markers ?? []) { const payment = paymentFromContent(marker.content); if (payment) payments.set(marker.guest_id, payment); }
       const settingsMarker = [...(markers ?? [])].reverse().find((marker) => paymentSettingsFromContent(marker.content));
-      return res.status(200).json({ guests: (guests ?? []).filter((guest) => !hidden.has(guest.id)).map((guest) => ({ ...guest, payment: payments.get(guest.id)?.status ?? 'pending' })), reminderEnabled: paymentSettingsFromContent(settingsMarker?.content)?.enabled ?? false });
+      return res.status(200).json({ guests: (guests ?? []).filter((guest) => !hidden.has(guest.id)).map((guest) => ({ ...guest, payment: payments.get(guest.id)?.status ?? 'pending', isAdmin: isCaptainGuest(guest.id, markers ?? []) })), reminderEnabled: paymentSettingsFromContent(settingsMarker?.content)?.enabled ?? false });
     }
 
     const adminGuestMatch = path.match(/^\/admin\/guests\/(\d+)$/);
@@ -436,10 +440,52 @@ export default async function handler(req, res) {
       const guest = guests?.[0];
       if (!guestResponse.ok) return res.status(guestResponse.status).json(guests);
       if (!guest) return res.status(404).json({ error: 'Convidado não encontrado.' });
+      const markerResponse = await rest(`niver_barco_posts?select=content&guest_id=eq.${guestId}`);
+      const markers = await readJson(markerResponse);
+      if (!markerResponse.ok) return res.status(markerResponse.status).json(markers);
+      if (isCaptainGuest(guestId, markers ?? [])) return res.status(403).json({ error: 'A conta do capitão não pode ser apagada pelo painel.' });
       const deleteResponse = await rest(`niver_barco_guests?id=eq.${guestId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
       if (!deleteResponse.ok) return res.status(deleteResponse.status).json(await readJson(deleteResponse));
       await deleteGuestMedia(guestId);
       return res.status(200).json({ ok: true, id: guestId, name: guest.name });
+    }
+
+    const adminPostMatch = path.match(/^\/admin\/posts\/(\d+)$/);
+    if (adminPostMatch && req.method === 'DELETE') {
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      const postId = Number(adminPostMatch[1]);
+      const postResponse = await rest(`niver_barco_posts?select=id,content&id=eq.${postId}`);
+      const posts = await readJson(postResponse); const post = posts?.[0];
+      if (!postResponse.ok) return res.status(postResponse.status).json(posts);
+      if (!post || isPrivateMarker(post.content)) return res.status(404).json({ error: 'Publicação não encontrada.' });
+      await rest(`niver_barco_reactions?post_id=eq.${postId}`, { method: 'DELETE' });
+      await rest(`niver_barco_replies?post_id=eq.${postId}`, { method: 'DELETE' });
+      const photo = parsePhotoPost(post.content);
+      const deleted = await rest(`niver_barco_posts?id=eq.${postId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (!deleted.ok) return res.status(deleted.status).json(await readJson(deleted));
+      if (photo?.url.startsWith(`${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/`)) {
+        const objectPath = decodeURIComponent(photo.url.split(`/public/${PHOTO_BUCKET}/`)[1] ?? '');
+        if (objectPath.startsWith('guests/')) await storage(`object/${PHOTO_BUCKET}`, { method: 'DELETE', body: JSON.stringify({ prefixes: [objectPath] }) });
+      }
+      return res.status(200).json({ ok: true, id: postId });
+    }
+
+    if (path === '/admin/photos' && req.method === 'DELETE') {
+      if (!await authorizedAdmin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      const objectPath = typeof req.body?.path === 'string' ? req.body.path : '';
+      if (!/^guests\/\d+\/[^/]+$/.test(objectPath)) return res.status(400).json({ error: 'Foto inválida.' });
+      const publicUrl = publicPhotoUrl(objectPath);
+      const postsResponse = await rest('niver_barco_posts?select=id,content'); const posts = await readJson(postsResponse);
+      if (!postsResponse.ok) return res.status(postsResponse.status).json(posts);
+      for (const post of posts ?? []) {
+        if (parsePhotoPost(post.content)?.url === publicUrl) {
+          await rest(`niver_barco_reactions?post_id=eq.${post.id}`, { method: 'DELETE' });
+          await rest(`niver_barco_replies?post_id=eq.${post.id}`, { method: 'DELETE' });
+          await rest(`niver_barco_posts?id=eq.${post.id}`, { method: 'DELETE' });
+        }
+      }
+      const deleted = await storage(`object/${PHOTO_BUCKET}`, { method: 'DELETE', body: JSON.stringify({ prefixes: [objectPath] }) });
+      return deleted.ok ? res.status(200).json({ ok: true }) : res.status(deleted.status).json(await readJson(deleted));
     }
 
     const paymentMatch = path.match(/^\/admin\/payments\/(\d+)$/);
