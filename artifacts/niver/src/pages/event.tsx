@@ -52,9 +52,19 @@ export default function Event() {
 
     <section className="glass-card relative overflow-hidden rounded-3xl p-5">
       <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-primary/12 blur-3xl" />
-      <div className="relative flex gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"><MapPinned className="h-5 w-5" /></span>
-        <div className="min-w-0"><p className="font-display text-lg text-foreground">Píer da Orla da Concha Acústica</p><p className="mt-1 text-sm italic leading-6 text-muted-foreground">Barco atracado em frente ao restaurante O Rei do Camarão.</p><a href="https://www.google.com/searchviewer/10?svid=CAwSHRIbCgNwdnESFENnMHZaeTh4TVdka2VXbzJNbnA1GAo" target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-[#ffe29b]"><MapPin className="h-4 w-4" />Abrir localização no Google Maps<ExternalLink className="h-3.5 w-3.5" /></a></div>
+      <div className="relative">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"><MapPinned className="h-5 w-5" /></span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">Onde embarcar</p>
+            <h2 className="mt-1 font-display text-xl leading-tight text-foreground">Píer da Orla da Concha Acústica</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">Barco atracado em frente ao restaurante O Rei do Camarão.</p>
+          </div>
+        </div>
+        <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-[#0a1020] shadow-[inset_0_1px_rgba(255,255,255,.05)]">
+          <iframe title="Mapa do Píer da Orla da Concha Acústica" src="https://www.google.com/maps?q=P%C3%ADer%20da%20Orla%20da%20Concha%20Ac%C3%BAstica%20Bras%C3%ADlia&output=embed" className="block h-44 w-full border-0 grayscale-[.15] contrast-[.9]" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+        </div>
+        <a href="https://www.google.com/searchviewer/10?svid=CAwSHRIbCgNwdnESFENnMHZaeTh4TVdka2VXbzJNbnA1GAo" target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary transition hover:text-[#ffe29b]"><MapPin className="h-4 w-4" />Abrir localização no Google Maps<ExternalLink className="h-3.5 w-3.5" /></a>
       </div>
     </section>
 
