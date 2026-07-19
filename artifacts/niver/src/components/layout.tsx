@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
-import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Waves } from "lucide-react";
+import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound } from "lucide-react";
 import { Button } from "./ui/button";
 import { PresenceCard } from './presence-card';
 import { useGetGuest, GuestRsvpStatus, getGetGuestQueryKey } from '@workspace/api-client-react';
@@ -32,7 +32,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <ShipWheel className="h-[1.15rem] w-[1.15rem]" />
           </Link>
           <Link href={session ? "/evento" : "/"} className="absolute left-1/2 flex -translate-x-1/2 flex-col items-center whitespace-nowrap text-center leading-none transition-opacity hover:opacity-85">
-            <Waves className="hidden h-3.5 w-3.5 text-[#9d74ff] sm:block" />
             <span className="font-display text-[.7rem] font-semibold uppercase tracking-[.14em] text-[#fff0c8] sm:text-xs sm:tracking-[.18em]">Renker Niver Barco</span>
             <span className="mt-1 text-[8px] font-medium uppercase tracking-[.16em] text-[#d3c7ec]/70 sm:text-[9px]">Terça-feira · 21 · 19h</span>
           </Link>

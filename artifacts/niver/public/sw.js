@@ -1,1 +1,55 @@
-const CACHE='niver-barco-shell-v1';const SHELL=['/','/evento','/manifest.webmanifest','/favicon.svg'];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x.startsWith('niver-barco-')&&x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==self.location.origin||e.request.url.includes('/api/'))return;e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(CACHE).then(x=>x.put(e.request,c));return r}).catch(()=>caches.match(e.request).then(c=>c||caches.match('/'))))});self.addEventListener('push',e=>{const d=e.data?e.data.json():{};e.waitUntil(self.registration.showNotification(d.title||'Renker Niver Barco',{body:d.body||'',icon:'/favicon.svg',badge:'/favicon.svg',tag:d.tag||'niver-barco',data:{url:d.url||'/evento'}}))});self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(w=>w[0]?w[0].focus().then(()=>w[0].navigate(e.notification.data.url)):clients.openWindow(e.notification.data.url)))})
+const CACHE = 'niver-barco-shell-v2';
+const SHELL = [
+  '/',
+  '/evento',
+  '/manifest.webmanifest',
+  '/favicon.svg',
+  '/renker-niver-app-icon-192.png',
+  '/renker-niver-app-icon-512.png',
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('niver-barco-') && key !== CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin || event.request.url.includes('/api/')) return;
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        const cached = response.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, cached));
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/'))),
+  );
+});
+
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : {};
+  event.waitUntil(self.registration.showNotification(data.title || 'Renker Niver Barco', {
+    body: data.body || '',
+    icon: '/renker-niver-app-icon-192.png',
+    badge: '/favicon.svg',
+    tag: data.tag || 'niver-barco',
+    data: { url: data.url || '/evento' },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      if (windows[0]) return windows[0].focus().then(() => windows[0].navigate(event.notification.data.url));
+      return clients.openWindow(event.notification.data.url);
+    }),
+  );
+});
