@@ -56,7 +56,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {session && <nav aria-label="Navegação principal" className="bottom-nav fixed inset-x-3 bottom-3 z-50 mx-auto max-w-lg">
         {navLinks.map(({ href, label, icon: Icon, featured }) => <Link key={href} href={href} aria-current={location === href ? 'page' : undefined} className={cn('bottom-nav-item', featured && 'bottom-nav-item-center')}><Icon className="bottom-nav-icon" /> <span className="bottom-nav-label">{label}</span></Link>)}
       </nav>}
-      <PwaControls hasSession={!!session} />
+      <PwaControls />
       {session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados' && <div className="fixed inset-0 z-[70] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md"><PresenceCard /></div></div>}
     </div>
   );

@@ -12,7 +12,7 @@ function isInstalled() {
   return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 }
 
-export function PwaControls({ hasSession }: { hasSession: boolean }) {
+export function PwaControls() {
   const [installed, setInstalled] = useState(true);
   const [installPrompt, setInstallPrompt] = useState<DeferredInstallPrompt | undefined>();
   const [updateReady, setUpdateReady] = useState<ServiceWorkerRegistration | undefined>();
@@ -39,7 +39,7 @@ export function PwaControls({ hasSession }: { hasSession: boolean }) {
     };
   }, []);
 
-  if (!hasSession || (installed && !updateReady)) return null;
+  if (installed && !updateReady) return null;
 
   const install = async () => {
     if (!installPrompt) return setShowInstallHelp(true);
