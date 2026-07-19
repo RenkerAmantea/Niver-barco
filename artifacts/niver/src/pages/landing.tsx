@@ -5,11 +5,11 @@ import { useGetRsvpSummary, useCreateGuest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, HelpCircle, XCircle, ArrowRight, Sparkles } from "lucide-react";
+import { CheckCircle2, HelpCircle, XCircle, ArrowRight, Sparkles, X } from "lucide-react";
 import { avatarAccents, avatarOptions, makeAvatar } from '@/lib/avatar-options';
 
 export default function Landing() {
-  const { session, lastSession, saveSession, resumeLastSession } = useSession();
+  const { session, deviceSessions, saveSession, forgetDeviceSession } = useSession();
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,7 +90,19 @@ export default function Landing() {
             </Button>
           </form>
           {entryError && <p role="alert" className="mt-4 rounded-xl border border-red-300/25 bg-red-500/10 px-3 py-2 text-center text-sm text-red-100">{entryError}</p>}
-          {lastSession && <button type="button" onClick={() => { resumeLastSession(); setLocation('/evento'); }} className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/25 bg-primary/[.07] px-4 text-sm font-medium text-primary transition hover:bg-primary/[.13] hover:text-[#ffe29b]">Entrar como {lastSession.name}</button>}
+          {deviceSessions.length > 0 && <div className="mt-6 w-full border-t border-white/10 pt-5">
+            <p className="mb-3 text-center text-[10px] font-semibold uppercase tracking-[.18em] text-white/45">Perfis neste aparelho</p>
+            <div className="space-y-2">
+              {deviceSessions.map((saved) => <div key={saved.id} className="flex min-h-12 items-center gap-2 rounded-xl border border-white/10 bg-black/20 p-1.5">
+                <button type="button" onClick={() => { saveSession(saved); setLocation('/evento'); }} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/[.06]">
+                  {saved.avatarUrl ? <img src={saved.avatarUrl} alt="" className="h-8 w-8 shrink-0 rounded-full border border-primary/25 object-cover" /> : <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-primary/25 bg-primary/10 text-sm font-semibold text-primary">{saved.name[0]?.toUpperCase()}</span>}
+                  <span className="truncate text-sm font-medium text-foreground">Entrar como {saved.name}</span>
+                </button>
+                <button type="button" onClick={() => forgetDeviceSession(saved.id)} aria-label={`Esquecer ${saved.name} deste aparelho`} title="Esquecer deste aparelho" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-white/35 transition hover:bg-white/[.06] hover:text-white/80"><X className="h-4 w-4" /></button>
+              </div>)}
+            </div>
+            <p className="mt-3 text-center text-xs leading-5 text-white/38">Toque para entrar. O X só remove o atalho deste aparelho.</p>
+          </div>}
         </CardContent>
       </Card>
 
