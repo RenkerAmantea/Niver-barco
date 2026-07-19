@@ -1,5 +1,10 @@
+import webpush from 'web-push';
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const ADMIN_PASSWORD = process.env.NIVER_ADMIN_PASSWORD;
 const PHOTO_BUCKET = 'niver-barco-fotos';
 
 function rest(path, options = {}) {
@@ -69,6 +74,52 @@ function replyReactionFromContent(content) {
   return match ? { replyId: Number(match[1]), emoji: match[2] } : null;
 }
 
+function pushSubscriptionFromContent(content) {
+  const match = typeof content === 'string' && content.match(/^\[\[niver-push-subscription\]\](.+)$/s);
+  if (!match) return null;
+  try { return JSON.parse(match[1]); } catch { return null; }
+}
+
+function isPrivateMarker(content) {
+  return noteFromContent(content) !== null || replyReactionFromContent(content) !== null || pushSubscriptionFromContent(content) !== null;
+}
+
+function admin(req) {
+  return Boolean(ADMIN_PASSWORD) && req.headers.authorization === `Bearer ${ADMIN_PASSWORD}`;
+}
+
+async function pushSubscriptions() {
+  const response = await rest('niver_barco_posts?select=id,guest_id,content');
+  const records = await readJson(response);
+  if (!response.ok) throw new Error(`Push subscriptions read failed: ${response.status}`);
+  return (records ?? []).flatMap((record) => {
+    const subscription = pushSubscriptionFromContent(record.content);
+    return subscription?.endpoint ? [{ ...subscription, markerId: record.id, guestId: record.guest_id }] : [];
+  });
+}
+
+async function sendPushToGuests(guestIds, payload) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !guestIds?.length) return { sent: 0, failed: 0 };
+  webpush.setVapidDetails('mailto:renker@niver-barco.app', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  const targetIds = new Set(guestIds);
+  const subscriptions = (await pushSubscriptions()).filter((item) => targetIds.has(item.guestId));
+  const result = { sent: 0, failed: 0 };
+  await Promise.all(subscriptions.map(async (item) => {
+    try {
+      await webpush.sendNotification(item.subscription, JSON.stringify(payload)); result.sent += 1;
+    } catch (error) {
+      result.failed += 1;
+      if (error?.statusCode === 404 || error?.statusCode === 410) await rest(`niver_barco_posts?id=eq.${item.markerId}`, { method: 'DELETE' });
+    }
+  }));
+  return result;
+}
+
+function mentionedGuestIds(content, guests) {
+  const lower = content.toLocaleLowerCase('pt-BR');
+  return guests.filter((guest) => lower.includes(`@${guest.name.toLocaleLowerCase('pt-BR')}`)).map((guest) => guest.id);
+}
+
 function normalizedName(name) {
   return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -131,6 +182,32 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET' && path === '/healthz') {
       return res.status(200).json({ ok: true });
+    }
+
+    if (req.method === 'GET' && path === '/push/config') {
+      return res.status(200).json({ supported: Boolean(VAPID_PUBLIC_KEY), publicKey: VAPID_PUBLIC_KEY ?? null });
+    }
+
+    if (req.method === 'POST' && path === '/push/subscriptions') {
+      const guestId = Number(req.body?.guestId);
+      const subscription = req.body?.subscription;
+      if (!Number.isInteger(guestId) || !subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) return res.status(400).json({ error: 'Inscrição de push inválida.' });
+      const old = await rest('niver_barco_posts?select=id,content'); const markers = await readJson(old);
+      for (const marker of markers ?? []) { const item = pushSubscriptionFromContent(marker.content); if (item?.endpoint === subscription.endpoint) await rest(`niver_barco_posts?id=eq.${marker.id}`, { method: 'DELETE' }); }
+      const response = await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: guestId, content: `[[niver-push-subscription]]${JSON.stringify({ subscription, preferences: req.body?.preferences ?? { replies: true, mentions: true, photos: true } })}` }) });
+      return response.ok ? res.status(201).json({ ok: true }) : res.status(response.status).json(await readJson(response));
+    }
+
+    if (path === '/admin/notify') {
+      if (!admin(req)) return res.status(401).json({ error: 'Área administrativa protegida.' });
+      if (req.method !== 'POST') return res.status(405).end();
+      const title = typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 80) : '';
+      const body = typeof req.body?.body === 'string' ? req.body.body.trim().slice(0, 240) : '';
+      const url = typeof req.body?.url === 'string' && req.body.url.startsWith('/') ? req.body.url : '/evento';
+      if (!title || !body) return res.status(400).json({ error: 'Título e mensagem são obrigatórios.' });
+      const records = await pushSubscriptions();
+      const outcome = await sendPushToGuests([...new Set(records.map((item) => item.guestId))], { title, body, url, tag: `admin-${Date.now()}` });
+      return res.status(200).json({ ...outcome, subscribedDevices: records.length });
     }
 
     if (req.method === 'GET' && path === '/photos') {
@@ -303,7 +380,7 @@ export default async function handler(req, res) {
         readJson(repliesResponse),
       ]);
       if (!postsResponse.ok) return res.status(postsResponse.status).json(posts);
-      return res.status(200).json(posts.filter((post) => noteFromContent(post.content) === null && replyReactionFromContent(post.content) === null).map((post) => postResponse(post, guests, replies)));
+      return res.status(200).json(posts.filter((post) => !isPrivateMarker(post.content)).map((post) => postResponse(post, guests, replies)));
     }
 
     if (req.method === 'POST' && path === '/posts') {
@@ -319,6 +396,11 @@ export default async function handler(req, res) {
       if (!response.ok) return res.status(response.status).json(posts);
       const guestsResponse = await rest(`niver_barco_guests?select=*&id=eq.${guestId}`);
       const guests = await readJson(guestsResponse);
+      const allGuestsResponse = await rest('niver_barco_guests?select=id,name');
+      const allGuests = await readJson(allGuestsResponse);
+      const photo = parsePhotoPost(content);
+      const targetIds = photo ? (allGuests ?? []).filter((guest) => guest.id !== guestId).map((guest) => guest.id) : mentionedGuestIds(content, allGuests ?? []).filter((id) => id !== guestId);
+      await sendPushToGuests(targetIds, photo ? { title: 'Nova foto a bordo', body: `${guests?.[0]?.name ?? 'Alguém'} subiu uma foto no convite.`, url: '/fotos', tag: `photo-${posts[0].id}` } : { title: 'Você foi marcado no mural', body: `${guests?.[0]?.name ?? 'Alguém'} te marcou: ${content.slice(0, 120)}`, url: `/forum#post-${posts[0].id}`, tag: `mention-${posts[0].id}` });
       return res.status(201).json(postResponse(posts[0], guests, []));
     }
 
@@ -350,6 +432,10 @@ export default async function handler(req, res) {
         if (!response.ok) return res.status(response.status).json(replies);
         const guestsResponse = await rest(`niver_barco_guests?select=*&id=eq.${guestId}`);
         const guests = await readJson(guestsResponse);
+        const [postOwnerResponse, allGuestsResponse] = await Promise.all([rest(`niver_barco_posts?select=guest_id&id=eq.${postId}`), rest('niver_barco_guests?select=id,name')]);
+        const [postOwner, allGuests] = await Promise.all([readJson(postOwnerResponse), readJson(allGuestsResponse)]);
+        const targetIds = [...new Set([postOwner?.[0]?.guest_id, ...mentionedGuestIds(content, allGuests ?? [])])].filter((id) => id && id !== guestId);
+        await sendPushToGuests(targetIds, { title: 'Nova resposta no mural', body: `${guests?.[0]?.name ?? 'Alguém'} respondeu: ${content.slice(0, 120)}`, url: `/forum#post-${postId}`, tag: `reply-${replies[0].id}` });
         return res.status(201).json(replyResponse(replies[0], guests));
       }
     }

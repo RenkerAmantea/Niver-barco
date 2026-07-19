@@ -11,6 +11,7 @@ import Forum from '@/pages/forum';
 import Event from '@/pages/event';
 import Gallery from '@/pages/gallery';
 import Profile from '@/pages/profile';
+import Admin from '@/pages/admin';
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ function Router() {
         <Route path="/forum" component={Forum} />
         <Route path="/fotos" component={Gallery} />
         <Route path="/perfil" component={Profile} />
+        <Route path="/admin" component={Admin} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -1,0 +1,13 @@
+import { useEffect, useState } from 'react';
+import { Bell, BellOff } from 'lucide-react';
+import { useSession } from '@/hooks/use-session';
+
+function keyToUint8Array(base64: string) { const raw = atob(base64.replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(raw, char => char.charCodeAt(0)); }
+
+export function PushControls() {
+  const { session } = useSession(); const [state, setState] = useState<NotificationPermission | 'unsupported'>('unsupported'); const [message, setMessage] = useState('');
+  useEffect(() => { if ('Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window) setState(Notification.permission); }, []);
+  const enable = async () => { if (!session) return; try { const config = await fetch('/api/push/config').then(r => r.json()); if (!config.supported) throw new Error('Push está sendo preparado. Tente em alguns minutos.'); const permission = await Notification.requestPermission(); setState(permission); if (permission !== 'granted') return setMessage('Você pode ativar depois nas permissões do navegador.'); const registration = await navigator.serviceWorker.ready; const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) }); const response = await fetch('/api/push/subscriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, subscription, preferences: { replies: true, mentions: true, photos: true } }) }); if (!response.ok) throw new Error('Não foi possível salvar a inscrição.'); setMessage('Pronto: você receberá novidades importantes do barco.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível ativar agora.'); } };
+  if (state === 'unsupported') return null;
+  return <section className="glass-card rounded-3xl p-5"><div className="flex items-start gap-3"><div className="grid h-10 w-10 place-items-center rounded-2xl border border-primary/30 bg-primary/10 text-primary">{state === 'granted' ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}</div><div className="min-w-0 flex-1"><h2 className="font-display text-lg">Avisos do barco</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">Receba marcações, respostas e fotos novas. É opcional.</p>{state === 'granted' ? <p className="mt-3 text-sm text-emerald-200">Notificações ativadas neste aparelho.</p> : <button type="button" onClick={() => void enable()} className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20">Ativar notificações</button>}{message && <p className="mt-2 text-xs text-muted-foreground">{message}</p>}</div></div></section>;
+}
