@@ -5,7 +5,8 @@ import { useGetRsvpSummary, useCreateGuest } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, HelpCircle, XCircle, ArrowRight, ShipWheel } from "lucide-react";
+import { CheckCircle2, HelpCircle, XCircle, ArrowRight, Sparkles } from "lucide-react";
+import { avatarOptions } from '@/lib/avatar-options';
 
 export default function Landing() {
   const { session, saveSession } = useSession();
@@ -31,7 +32,7 @@ export default function Landing() {
     setIsSubmitting(true);
     try {
       createGuest.mutate(
-        { data: { name: name.trim() } },
+      { data: { name: name.trim(), avatarUrl: avatarOptions[Math.floor(Math.random() * avatarOptions.length)].url } },
         {
           onSuccess: (guest) => {
             saveSession({ id: guest.id, name: guest.name, avatarUrl: guest.avatarUrl });
@@ -53,21 +54,18 @@ export default function Landing() {
       
       {/* Hero Section */}
       <div className="relative mx-auto mb-10 max-w-2xl space-y-5 text-center md:mb-14">
-        <div className="hero-kicker inline-flex items-center gap-2 rounded-full border border-[#f3c45f]/30 bg-[#10142b]/55 px-4 py-2 text-[10px] font-semibold uppercase text-[#ffd782] backdrop-blur-xl">
-          <ShipWheel className="h-3.5 w-3.5" /> terça · 21 julho · 19h
-        </div>
+        <div className="hero-kicker shimmer inline-flex items-center gap-2 rounded-full border border-[#f3c45f]/40 bg-[#2a1a05]/55 px-4 py-2 text-[10px] font-semibold uppercase text-[#ffe39a] backdrop-blur-xl"><Sparkles className="h-3.5 w-3.5" /> convite vip</div>
         <h1 className="pb-1 text-5xl font-display font-bold leading-[.88] tracking-[-.06em] text-transparent bg-clip-text bg-gradient-to-br from-[#fff5dc] via-[#f3cf86] to-[#bd8038] md:text-7xl">
           Renker<br/><span className="bg-gradient-to-r from-[#ff53bc] to-[#a368ff] bg-clip-text text-transparent">Niver Barco</span>
         </h1>
-        <p className="mx-auto max-w-md text-base leading-7 text-white/78 md:text-lg">
-          Uma resenha pequena, num barco grande. A Renker Party oficial segue viva, só ficou para depois.
-        </p>
+        <p className="event-signature">terça-feira · 21 de julho · 19h</p>
+        <p className="mx-auto max-w-md text-base leading-7 text-white/78 md:text-lg">Uma resenha pequena, um barco e uma comemoração simples. A grande Renker Party fica para mais pra frente.</p>
       </div>
 
       {/* Login / Registration Card */}
       <Card className="glass-card group relative mx-auto mb-10 w-full max-w-md overflow-hidden border-[#f3c45f]/20 bg-[#0b1026]/62">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#ffd782]/[.09] via-transparent to-[#e8329d]/[.08] opacity-80" />
-        <CardContent className="p-8 pt-8 flex flex-col items-center">
+        <CardContent className="relative z-10 p-8 pt-8 flex flex-col items-center">
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.22em] text-[#ffd782]">embarque confirmado</p>
           <h2 className="mb-2 text-center text-2xl font-display font-semibold text-foreground">Como te chamamos?</h2>
           <p className="mb-6 text-center text-sm text-muted-foreground">Entre para confirmar presença e ver a tripulação.</p>
@@ -83,7 +81,7 @@ export default function Landing() {
               type="submit" 
               size="lg" 
               disabled={!name.trim() || isSubmitting}
-              className="premium-cta shimmer h-14 w-full border-0 bg-gradient-to-r from-[#f7c968] via-[#e6ad46] to-[#c7842d] text-lg font-semibold text-[#150d05] transition-all hover:from-[#ffe29b] hover:to-[#e7ae4c]"
+              className="premium-cta shimmer h-14 w-full border border-[#fff0b4]/70 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] text-lg font-bold text-[#150d05] opacity-100 transition-all hover:from-[#fff1bc] hover:via-[#f7cc69] hover:to-[#df9132]"
             >
               {isSubmitting ? "Entrando..." : "Entrar no Evento"} <ArrowRight className="ml-2 h-5 w-5" />
             </Button>

@@ -194,6 +194,14 @@
     text-shadow: 0 0 20px rgba(255, 206, 112, .42);
   }
 
+  .event-signature {
+    color: rgba(255, 221, 149, .82);
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+  }
+
   .premium-input {
     box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 14px 30px rgba(0,0,0,.2);
   }

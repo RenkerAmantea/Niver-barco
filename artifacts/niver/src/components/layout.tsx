@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
-import { LogOut, ShipWheel, CalendarDays, UsersRound, MessageCircle, Images, Waves } from "lucide-react";
+import { LogOut, ShipWheel, CalendarDays, UsersRound, MessageCircle, Images, UserRound, Waves } from "lucide-react";
 import { Button } from "./ui/button";
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -18,6 +18,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/convidados", label: "Convidados", icon: UsersRound },
     { href: "/forum", label: "Mural", icon: MessageCircle },
     { href: "/fotos", label: "Fotos", icon: Images },
+    { href: "/perfil", label: "Perfil", icon: UserRound },
   ];
 
   return (
@@ -48,8 +49,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <footer className="border-t border-white/5 py-8 pb-24 text-center text-sm text-muted-foreground">
         <p>Renker de Bolso, porque nem todo aniversário precisa de uma operação logística de médio porte.</p>
       </footer>
-      {session && <nav aria-label="Navegação principal" className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-lg items-center justify-around rounded-2xl border border-white/12 bg-[#090b1c]/84 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,.07),0_14px_32px_rgba(0,0,0,.36)] backdrop-blur-xl">
-        {navLinks.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={cn("flex min-w-15 cursor-pointer flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] transition-all", location === href ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")}><Icon className="h-4 w-4" />{label}</Link>)}
+      {session && <nav aria-label="Navegação principal" className="fixed inset-x-3 bottom-3 z-50 mx-auto flex max-w-lg items-center justify-around rounded-2xl border border-white/12 bg-[#090b1c]/84 px-1 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,.07),0_14px_32px_rgba(0,0,0,.36)] backdrop-blur-xl">
+        {navLinks.map(({ href, label, icon: Icon }) => <Link key={href} href={href} className={cn("flex min-w-0 cursor-pointer flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] transition-all sm:min-w-15 sm:px-3 sm:text-[10px]", location === href ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-white/5 hover:text-foreground")}><Icon className="h-4 w-4" />{label}</Link>)}
       </nav>}
     </div>
   );

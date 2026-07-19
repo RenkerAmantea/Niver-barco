@@ -150,7 +150,10 @@ export default async function handler(req, res) {
       if (!guests?.[0]) return res.status(404).json({ error: 'Convidado não encontrado' });
       await ensurePhotoBucket();
       const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic' }[contentType];
-      const objectName = `guests/${guestId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+      const isAvatar = req.body?.purpose === 'avatar';
+      const objectName = isAvatar
+        ? `avatars/${guestId}/${Date.now()}-${crypto.randomUUID()}.${extension}`
+        : `guests/${guestId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
       const signedResponse = await storage(`object/upload/sign/${PHOTO_BUCKET}/${objectName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -177,7 +180,7 @@ export default async function handler(req, res) {
       const response = await rest('niver_barco_guests', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
-        body: JSON.stringify({ name, rsvp_status: req.body?.rsvpStatus ?? 'pending' }),
+        body: JSON.stringify({ name, avatar_url: typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl : null, rsvp_status: req.body?.rsvpStatus ?? 'pending' }),
       });
       const guests = await readJson(response);
       return res.status(response.status).json(guestResponse(guests[0]));
@@ -202,6 +205,19 @@ export default async function handler(req, res) {
         const guests = await readJson(response);
         return guests?.[0] ? res.status(200).json(guestResponse(guests[0])) : res.status(404).json({ error: 'Guest not found' });
       }
+    }
+
+    const profileMatch = path.match(/^\/guests\/(\d+)\/profile$/);
+    if (profileMatch && req.method === 'PATCH') {
+      const guestId = Number(profileMatch[1]);
+      const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+      const avatarUrl = typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl : null;
+      if (!name || name.length > 80) return res.status(400).json({ error: 'Nome inválido' });
+      const response = await rest(`niver_barco_guests?id=eq.${guestId}`, {
+        method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, avatar_url: avatarUrl }),
+      });
+      const guests = await readJson(response);
+      return guests?.[0] ? res.status(200).json(guestResponse(guests[0])) : res.status(404).json({ error: 'Convidado não encontrado' });
     }
 
     if (req.method === 'GET' && path === '/stats/rsvp-summary') {

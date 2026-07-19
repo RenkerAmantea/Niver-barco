@@ -10,6 +10,7 @@ import Guests from '@/pages/guests';
 import Forum from '@/pages/forum';
 import Event from '@/pages/event';
 import Gallery from '@/pages/gallery';
+import Profile from '@/pages/profile';
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/convidados" component={Guests} />
         <Route path="/forum" component={Forum} />
         <Route path="/fotos" component={Gallery} />
+        <Route path="/perfil" component={Profile} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
