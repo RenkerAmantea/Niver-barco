@@ -13,6 +13,7 @@ export default function Landing() {
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [entryError, setEntryError] = useState<string | null>(null);
 
   const { data: summary, isLoading: isLoadingSummary } = useGetRsvpSummary();
   const createGuest = useCreateGuest();
@@ -30,6 +31,7 @@ export default function Landing() {
     if (!name.trim()) return;
 
     setIsSubmitting(true);
+    setEntryError(null);
     try {
       createGuest.mutate(
       { data: { name: name.trim(), avatarUrl: makeAvatar(avatarOptions[Math.floor(Math.random() * avatarOptions.length)].id, avatarAccents[Math.floor(Math.random() * avatarAccents.length)].id) } },
@@ -40,7 +42,8 @@ export default function Landing() {
           },
           onSettled: () => {
             setIsSubmitting(false);
-          }
+          },
+          onError: (error: Error) => setEntryError(error.message || 'Não foi possível entrar agora.')
         }
       );
     } catch (error) {
@@ -86,6 +89,7 @@ export default function Landing() {
               {isSubmitting ? "Entrando..." : "Entrar no Evento"} <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </form>
+          {entryError && <p role="alert" className="mt-4 rounded-xl border border-red-300/25 bg-red-500/10 px-3 py-2 text-center text-sm text-red-100">{entryError}</p>}
           {lastSession && <button type="button" onClick={() => { resumeLastSession(); setLocation('/evento'); }} className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl border border-primary/25 bg-primary/[.07] px-4 text-sm font-medium text-primary transition hover:bg-primary/[.13] hover:text-[#ffe29b]">Entrar como {lastSession.name}</button>}
         </CardContent>
       </Card>

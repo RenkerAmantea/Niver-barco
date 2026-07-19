@@ -64,6 +64,15 @@ function noteFromContent(content) {
   return match ? match[1].trim() : null;
 }
 
+function replyReactionFromContent(content) {
+  const match = typeof content === 'string' && content.match(/^\[\[niver-reply-reaction:(\d+):(heart|fire|boat|party)\]\]$/);
+  return match ? { replyId: Number(match[1]), emoji: match[2] } : null;
+}
+
+function normalizedName(name) {
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 function rsvpNotes(posts) {
   const notes = new Map();
   for (const post of posts ?? []) {
@@ -213,6 +222,10 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && path === '/guests') {
       const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
       if (!name) return res.status(400).json({ error: 'Nome é obrigatório' });
+      const existingResponse = await rest('niver_barco_guests?select=id,name');
+      const existing = await readJson(existingResponse);
+      if (!existingResponse.ok) return res.status(existingResponse.status).json(existing);
+      if ((existing ?? []).some((guest) => normalizedName(guest.name) === normalizedName(name))) return res.status(409).json({ error: 'Esse nome já está em uso. Se você já entrou antes, use “Entrar como” para retomar seu perfil.' });
       const response = await rest('niver_barco_guests', {
         method: 'POST',
         headers: { Prefer: 'return=representation' },
@@ -256,6 +269,10 @@ export default async function handler(req, res) {
       const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
       const avatarUrl = typeof req.body?.avatarUrl === 'string' ? req.body.avatarUrl : null;
       if (!name || name.length > 80) return res.status(400).json({ error: 'Nome inválido' });
+      const namesResponse = await rest('niver_barco_guests?select=id,name');
+      const names = await readJson(namesResponse);
+      if (!namesResponse.ok) return res.status(namesResponse.status).json(names);
+      if ((names ?? []).some((guest) => guest.id !== guestId && normalizedName(guest.name) === normalizedName(name))) return res.status(409).json({ error: 'Esse nome já está em uso.' });
       const response = await rest(`niver_barco_guests?id=eq.${guestId}`, {
         method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ name, avatar_url: avatarUrl }),
       });
@@ -286,7 +303,7 @@ export default async function handler(req, res) {
         readJson(repliesResponse),
       ]);
       if (!postsResponse.ok) return res.status(postsResponse.status).json(posts);
-      return res.status(200).json(posts.filter((post) => noteFromContent(post.content) === null).map((post) => postResponse(post, guests, replies)));
+      return res.status(200).json(posts.filter((post) => noteFromContent(post.content) === null && replyReactionFromContent(post.content) === null).map((post) => postResponse(post, guests, replies)));
     }
 
     if (req.method === 'POST' && path === '/posts') {
@@ -309,13 +326,16 @@ export default async function handler(req, res) {
     if (repliesMatch) {
       const postId = Number(repliesMatch[1]);
       if (req.method === 'GET') {
-        const [repliesResponse, guestsResponse] = await Promise.all([
+        const [repliesResponse, guestsResponse, markersResponse] = await Promise.all([
           rest(`niver_barco_replies?select=*&post_id=eq.${postId}&order=created_at.asc`),
           rest('niver_barco_guests?select=*'),
+          rest('niver_barco_posts?select=guest_id,content'),
         ]);
-        const [replies, guests] = await Promise.all([readJson(repliesResponse), readJson(guestsResponse)]);
+        const [replies, guests, markers] = await Promise.all([readJson(repliesResponse), readJson(guestsResponse), readJson(markersResponse)]);
         if (!repliesResponse.ok) return res.status(repliesResponse.status).json(replies);
-        return res.status(200).json(replies.map((reply) => replyResponse(reply, guests)));
+        const reactionsByReply = new Map();
+        for (const marker of markers ?? []) { const reaction = replyReactionFromContent(marker.content); if (reaction) { const bucket = reactionsByReply.get(reaction.replyId) ?? []; bucket.push({ emoji: reaction.emoji, guest_id: marker.guest_id }); reactionsByReply.set(reaction.replyId, bucket); } }
+        return res.status(200).json(replies.map((reply) => ({ ...replyResponse(reply, guests), reactions: reactionsByReply.get(reply.id) ?? [] })));
       }
       if (req.method === 'POST') {
         const guestId = Number(req.body?.guestId);
@@ -332,6 +352,22 @@ export default async function handler(req, res) {
         const guests = await readJson(guestsResponse);
         return res.status(201).json(replyResponse(replies[0], guests));
       }
+    }
+
+    const replyReactionsMatch = path.match(/^\/replies\/(\d+)\/reactions$/);
+    if (replyReactionsMatch) {
+      const replyId = Number(replyReactionsMatch[1]);
+      const allowed = new Set(['heart', 'fire', 'boat', 'party']);
+      if (req.method === 'GET') {
+        const response = await rest('niver_barco_posts?select=guest_id,content'); const markers = await readJson(response);
+        if (!response.ok) return res.status(response.status).json(markers);
+        return res.status(200).json((markers ?? []).flatMap((marker) => { const reaction = replyReactionFromContent(marker.content); return reaction?.replyId === replyId ? [{ emoji: reaction.emoji, guest_id: marker.guest_id }] : []; }));
+      }
+      const guestId = Number(req.body?.guestId); const emoji = req.body?.emoji;
+      if (!Number.isInteger(guestId) || !allowed.has(emoji)) return res.status(400).json({ error: 'Reação inválida' });
+      const content = `[[niver-reply-reaction:${replyId}:${emoji}]]`;
+      if (req.method === 'POST') { const response = await rest('niver_barco_posts', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_id: guestId, content }) }); return res.status(response.status).json(response.ok ? { ok: true } : await readJson(response)); }
+      if (req.method === 'DELETE') { const response = await rest(`niver_barco_posts?guest_id=eq.${guestId}&content=eq.${encodeURIComponent(content)}`, { method: 'DELETE' }); return response.ok ? res.status(204).end() : res.status(response.status).json(await readJson(response)); }
     }
 
     const reactionsMatch = path.match(/^\/posts\/(\d+)\/reactions$/);

@@ -19,13 +19,6 @@ import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Sparkles,
 import { cn } from "@/lib/utils";
 import { PostReplies } from "@/components/post-replies";
 
-const reactionOptions = [
-  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/30 text-pink-100', iconClass: 'fill-pink-400 text-pink-200' },
-  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'border-orange-300/55 bg-orange-500/30 text-orange-100', iconClass: 'fill-orange-400 text-orange-100' },
-  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'border-sky-300/55 bg-sky-500/30 text-sky-100', iconClass: 'text-sky-100' },
-  { key: 'party', label: 'Brilho', icon: Sparkles, activeClass: 'border-violet-300/55 bg-violet-500/20 text-violet-200', iconClass: 'text-violet-200' },
-];
-
 const photoMarker = '[[niver-photo:';
 
 function splitPhotoPost(content: string) {
@@ -36,7 +29,14 @@ function splitPhotoPost(content: string) {
   return { url, source, caption: content.slice(end + 2).trim() };
 }
 
-function ReactionBar({ postId }: { postId: number }) {
+export const reactionOptions = [
+  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/30 text-pink-100', iconClass: 'fill-pink-400 text-pink-200' },
+  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'border-orange-300/55 bg-orange-500/30 text-orange-100', iconClass: 'fill-orange-400 text-orange-100' },
+  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'border-sky-300/55 bg-sky-500/30 text-sky-100', iconClass: 'text-sky-100' },
+  { key: 'party', label: 'Brilho', icon: Sparkles, activeClass: 'border-violet-300/55 bg-violet-500/20 text-violet-200', iconClass: 'text-violet-200' },
+];
+
+function ReactionBar({ postId, compact = false }: { postId: number; compact?: boolean }) {
   const { session } = useSession();
   const [reactions, setReactions] = useState<Record<string, { count: number; reacted: boolean }>>({});
   const [burst, setBurst] = useState<string | null>(null);
@@ -56,7 +56,7 @@ function ReactionBar({ postId }: { postId: number }) {
     if (!active) { setBurst(emoji); window.setTimeout(() => setBurst(null), 420); }
     void load();
   };
-  return <div className="flex flex-wrap gap-2 pt-3">{reactionOptions.map(({ key, label, icon: Icon, activeClass, iconClass }) => {
+  return <div className={cn("flex items-center gap-1.5", !compact && "flex-wrap pt-3")}>{reactionOptions.map(({ key, label, icon: Icon, activeClass, iconClass }) => {
     const active = reactions[key]?.reacted;
     return <button key={key} type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className={cn("reaction-chip reaction-icon-chip cursor-pointer", active && activeClass, burst === key && "reaction-burst")}><Icon className={cn("h-4 w-4", iconClass, active && key === 'party' && 'fill-current')} />{reactions[key]?.count > 0 && <span>{reactions[key].count}</span>}</button>;
   })}</div>;
@@ -220,7 +220,7 @@ export default function Forum() {
                     </div>
                     {(() => { const photo = splitPhotoPost(post.content); return photo ? <div className="space-y-3"><img src={photo.url} alt={`Foto publicada por ${post.guestName}`} className="max-h-[32rem] w-full rounded-2xl border border-white/10 object-cover" />{photo.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{photo.caption}</p>}</div> : <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{post.content}</p>; })()}
                     
-                    <div className="mt-4 pt-4 border-t border-white/5 flex">
+                    <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/5 pt-3">
                       <Button 
                         variant="ghost" 
                         size="sm" 
@@ -231,13 +231,10 @@ export default function Forum() {
                         )}
                       >
                         <MessageSquare className="h-4 w-4 mr-2" />
-                        {post.replyCount === 0 
-                          ? "Responder" 
-                          : `${post.replyCount} ${post.replyCount === 1 ? 'resposta' : 'respostas'}`
-                        }
+                        {post.replyCount}
                       </Button>
+                      <ReactionBar postId={post.id} compact />
                     </div>
-                    <ReactionBar postId={post.id} />
                   </div>
                 </div>
 
