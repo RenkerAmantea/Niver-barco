@@ -169,7 +169,7 @@ async function pushSubscriptions() {
   if (!response.ok) throw new Error(`Push subscriptions read failed: ${response.status}`);
   return (records ?? []).flatMap((record) => {
     const subscription = pushSubscriptionFromContent(record.content);
-    return subscription?.endpoint ? [{ ...subscription, markerId: record.id, guestId: record.guest_id }] : [];
+    return subscription?.subscription?.endpoint ? [{ ...subscription, markerId: record.id, guestId: record.guest_id }] : [];
   });
 }
 
