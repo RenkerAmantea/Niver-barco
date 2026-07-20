@@ -81,10 +81,10 @@ function AudioPlayer({ src, durationMs }: { src: string; durationMs?: number }) 
 }
 
 export const reactionOptions = [
-  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'fill-pink-400 text-pink-200' },
-  { key: 'thumb', label: 'Joinha', icon: ThumbsUp, activeClass: 'fill-sky-400 text-sky-200' },
-  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'fill-orange-400 text-orange-100' },
-  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'fill-sky-400 text-sky-100' },
+  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'text-[#ff66ad]', fillClass: 'fill-[#ff66ad]' },
+  { key: 'thumb', label: 'Joinha', icon: ThumbsUp, activeClass: 'text-[#5bbcff]', fillClass: 'fill-[#5bbcff]' },
+  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'text-[#ff9b4a]', fillClass: 'fill-[#ff9b4a]' },
+  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'text-[#63dce8]', fillClass: 'fill-[#63dce8]' },
 ];
 
 function ReactionBar({ postId, compact = false }: { postId: number; compact?: boolean }) {
@@ -92,7 +92,6 @@ function ReactionBar({ postId, compact = false }: { postId: number; compact?: bo
   const { data: guests } = useListGuests();
   const [reactions, setReactions] = useState<Record<string, { count: number; reacted: boolean }>>({});
   const [reactionList, setReactionList] = useState<Array<{ emoji: string; guest_id: number }>>([]);
-  const [burst, setBurst] = useState<string | null>(null);
   const [peopleFor, setPeopleFor] = useState<string | null>(null);
   const load = async () => {
     const response = await fetch(`/api/posts/${postId}/reactions`);
@@ -107,15 +106,15 @@ function ReactionBar({ postId, compact = false }: { postId: number; compact?: bo
   const toggle = async (emoji: string) => {
     if (!session?.id) return;
     const active = reactions[emoji]?.reacted;
-    await fetch(`/api/posts/${postId}/reactions`, { method: active ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, emoji }) });
-    if (!active) { setBurst(emoji); window.setTimeout(() => setBurst(null), 420); }
+    const response = await fetch(`/api/posts/${postId}/reactions`, { method: active ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, emoji }) });
+    if (!response.ok) return;
     void load();
   };
   const selected = reactionOptions.find((reaction) => reaction.key === peopleFor);
-  return <><div className={cn("flex items-center gap-1", !compact && "flex-wrap pt-3")}>{reactionOptions.map(({ key, label, icon: Icon, activeClass }) => {
+  return <><div className={cn("flex items-center gap-1", !compact && "flex-wrap pt-3")}>{reactionOptions.map(({ key, label, icon: Icon, activeClass, fillClass }) => {
     const active = reactions[key]?.reacted;
     const count = reactions[key]?.count ?? 0;
-    return <div key={key} className={cn("inline-flex h-8 items-center", count > 0 && activeClass, burst === key && "reaction-burst")}><button type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className="grid h-8 w-7 cursor-pointer place-items-center rounded-lg text-white/35 transition-all hover:bg-white/[.055] hover:text-white/75"><Icon className={cn("h-4 w-4", count > 0 && "fill-current")} /></button>{count > 0 && <button type="button" onClick={() => setPeopleFor(key)} aria-label={`Ver quem reagiu com ${label}`} className="min-w-4 pr-1 text-left text-[11px] font-semibold transition-opacity hover:opacity-75">{count}</button>}</div>;
+    return <div key={key} className={cn("inline-flex h-8 items-center", count > 0 ? activeClass : "text-white/35")}><button type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className="grid h-8 w-7 cursor-pointer place-items-center rounded-lg transition-opacity hover:opacity-75"><Icon className={cn("h-4 w-4", count > 0 && fillClass)} /></button>{count > 0 && <button type="button" onClick={() => setPeopleFor(key)} aria-label={`Ver quem reagiu com ${label}`} className="min-w-4 pr-1 text-left text-[11px] font-semibold transition-opacity hover:opacity-75">{count}</button>}</div>;
   })}</div>{selected && <ReactionPeopleDialog open={Boolean(peopleFor)} onOpenChange={(open) => !open && setPeopleFor(null)} emoji={selected.key} label={selected.label} Icon={selected.icon} reactions={reactionList} guests={guests} />}</>;
 }
 

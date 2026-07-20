@@ -2279,6 +2279,19 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Reação inválida" });
       const content = `[[niver-reply-reaction:${replyId}:${emoji}]]`;
       if (req.method === "POST") {
+        // Cada pessoa escolhe uma reação por resposta. Trocar de emoji substitui
+        // a escolha anterior em vez de acumular vários símbolos.
+        const markersResponse = await rest(
+          `niver_barco_posts?select=id,guest_id,content&guest_id=eq.${guestId}`,
+        );
+        const markers = await readJson(markersResponse);
+        if (!markersResponse.ok)
+          return res.status(markersResponse.status).json(markers);
+        for (const marker of markers ?? []) {
+          const previous = replyReactionFromContent(marker.content);
+          if (previous?.replyId === replyId)
+            await rest(`niver_barco_posts?id=eq.${marker.id}`, { method: "DELETE" });
+        }
         const response = await rest("niver_barco_posts", {
           method: "POST",
           headers: { Prefer: "return=minimal" },
@@ -2323,6 +2336,13 @@ export default async function handler(req, res) {
       if (!Number.isInteger(guestId) || !allowed.has(emoji))
         return res.status(400).json({ error: "Reação inválida" });
       if (req.method === "POST") {
+        // Reação única por pessoa em cada post: o emoji novo substitui o antigo.
+        const cleared = await rest(
+          `niver_barco_reactions?post_id=eq.${postId}&guest_id=eq.${guestId}`,
+          { method: "DELETE" },
+        );
+        if (!cleared.ok)
+          return res.status(cleared.status).json(await readJson(cleared));
         const response = await rest("niver_barco_reactions", {
           method: "POST",
           headers: { Prefer: "return=representation" },
