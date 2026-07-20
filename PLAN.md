@@ -157,3 +157,16 @@ Fase 7 concluída. Convites novos usam nome + 8 caracteres aleatórios (48 bits)
 ## Estado atual
 
 Fase 8 concluída. Em produção, convite novo segue o formato `nome-1234`, pede senha antes de ativar e se torna inacessível pelo mesmo URL após a ativação. O FAQ oferece cópia do link público normal. A auditoria de push confirma VAPID configurado e par de chaves consistente; a contagem atual é realmente zero inscrições salvas, e o admin deixa isso explícito em vez de fingir entrega. QA real: convite de 4 dígitos criado, senha curta recusada, ativação válida concluída, segundo acesso devolveu 409, FAQ/cópia inspecionados, aliases com o mesmo bundle e perfil temporário removido.
+
+### Fase 9: Incidente de inscrição push no Chrome Android
+
+- [x] **T9.1** — Substituir a recuperação falsa após `AbortError` por uma recuperação de verdade: limpar somente o worker/cache deste app, recarregar e tentar em uma nova vida de service worker.
+  - Verificação: o fluxo não tenta se inscrever em um worker já desregistrado; a segunda tentativa ocorre depois de novo carregamento e expõe estado do worker/chave no diagnóstico.
+- [x] **T9.2** — Comparar as configurações servidas no domínio novo, legado e deployments anteriores; provar a inscrição Web Push no mesmo domínio de produção.
+  - Verificação: VAPID/par/chave e `sw.js` conferem; teste de PushManager no domínio canônico retorna endpoint FCM.
+- [ ] **T9.3** — Publicar uma vez nos aliases e rodar QA de produção, incluindo worker, manifest, APIs de push e interface mobile.
+  - Verificação: typecheck/build passam; ambos os aliases retornam o mesmo bundle/worker; diagnóstico mostra os estados úteis sem segredo.
+
+## Estado atual
+
+Fase 9 em andamento. O diagnóstico recebido do POCO confirma `permission=granted`, PWA e HTTPS corretos; a falha é `AbortError` exclusivamente em `PushManager.subscribe`. A auditoria reproduziu uma inscrição FCM com sucesso no domínio canônico em Chrome isolado, eliminando servidor/VAPID como causa. A recuperação foi corrigida para limpar somente worker/cache do app e recarregar antes da próxima tentativa; o diagnóstico ganhou estado de rede, worker, inscrição anterior, versão do Chrome e fingerprint não secreta da chave. Ainda falta publicar e validar os aliases.

@@ -36,6 +36,26 @@ async function getVerifiedServiceWorker() {
   return navigator.serviceWorker.ready;
 }
 
+function workerSummary(registration: ServiceWorkerRegistration | null) {
+  if (!registration) return 'nenhum';
+  return [
+    registration.active ? `ativo:${new URL(registration.active.scriptURL).pathname}` : 'ativo:não',
+    registration.waiting ? `aguardando:${new URL(registration.waiting.scriptURL).pathname}` : 'aguardando:não',
+    registration.installing ? `instalando:${new URL(registration.installing.scriptURL).pathname}` : 'instalando:não',
+  ].join(', ');
+}
+
+async function resetOnlyThisAppsPushState() {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(registrations
+    .filter((registration) => new URL(registration.scope).origin === window.location.origin)
+    .map((registration) => registration.unregister()));
+  const keys = await caches.keys();
+  await Promise.all(keys
+    .filter((key) => key.startsWith('niver-barco-'))
+    .map((key) => caches.delete(key)));
+}
+
 export function PushControls() {
   const { session } = useSession();
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('unsupported');
@@ -72,22 +92,27 @@ export function PushControls() {
     if (isIOS && !isStandalone) { setMessage('No iPhone, notificações só funcionam pelo app instalado. Toque em “Compartilhar” no Safari → “Adicionar à Tela de Início” e abra pelo novo ícone Renker Niver.'); return; }
     setChecking(true); setMessage(''); setDiagnostic('');
     let stage = 'início';
+    let registration: ServiceWorkerRegistration | null = null;
+    let configFingerprint = 'indisponível';
+    let hadSubscription = false;
     try {
       stage = 'configuração do servidor';
-      const configResponse = await fetch('/api/push/config');
+      const configResponse = await fetch('/api/push/config', { cache: 'no-store' });
       const config = await configResponse.json();
       if (!configResponse.ok || !config.supported || !config.publicKey) throw new Error('Push está sendo preparado. Tente em alguns minutos.');
       const healthResponse = await fetch('/api/push/health', { cache: 'no-store' });
       const health = await healthResponse.json().catch(() => null);
       if (!healthResponse.ok || !health?.configured) throw new Error('O servidor de notificações não está configurado.');
       if (!health.pairMatches) throw new Error('A configuração de segurança do push no servidor não confere. Já identificamos o ponto para correção.');
+      configFingerprint = health.publicKeyFingerprint ?? 'indisponível';
       stage = 'permissão do navegador';
       const nextPermission = await Notification.requestPermission();
       setPermission(nextPermission);
       if (nextPermission !== 'granted') { setSubscribed(false); setMessage('Você pode ativar depois nas permissões do navegador.'); return; }
       stage = 'service worker';
-      const registration = await getVerifiedServiceWorker();
+      registration = await getVerifiedServiceWorker();
       const previousSubscription = await registration.pushManager.getSubscription();
+      hadSubscription = Boolean(previousSubscription);
       const options = { userVisibleOnly: true, applicationServerKey: keyToUint8Array(config.publicKey) };
       let subscription: PushSubscription;
       // Do not unsubscribe a healthy Chrome subscription on every tap. On
@@ -101,17 +126,27 @@ export function PushControls() {
           stage = 'inscrição no serviço de push do Chrome';
           subscription = await registration.pushManager.subscribe(options);
         } catch (firstError) {
-        // Android/Chrome can retain a broken worker after an app/domain update.
-        // Re-register once before reporting a browser push-service error.
-        const message = firstError instanceof Error ? firstError.message : '';
-        if (!/push service|registration failed|abort/i.test(message)) throw firstError;
-        await registration.unregister();
-        const freshRegistration = await getVerifiedServiceWorker();
-        const activeRegistration = freshRegistration;
-          stage = 'segunda tentativa de inscrição no Chrome';
-          subscription = await activeRegistration.pushManager.subscribe(options);
+          // O fluxo antigo desregistrava o worker e tentava se inscrever de
+          // novo na mesma execução. `navigator.serviceWorker.ready` pode
+          // devolver aquele worker antigo nesse intervalo, ou seja: a
+          // “segunda tentativa” nunca era realmente limpa. No Android isso
+          // mantém o AbortError. Fazemos a recuperação em duas vidas: limpa
+          // apenas este app, recarrega e só então permite uma nova inscrição.
+          const message = firstError instanceof Error ? firstError.message : '';
+          if (!/push service|registration failed|abort/i.test(message)) throw firstError;
+          const repairKey = `niver_push_repair:${window.location.origin}`;
+          if (!sessionStorage.getItem(repairKey)) {
+            stage = 'recuperação limpa do app';
+            sessionStorage.setItem(repairKey, '1');
+            await resetOnlyThisAppsPushState();
+            setMessage('Preparei uma ativação limpa deste app. Ele será recarregado agora; depois toque em “Concluir ativação” uma vez.');
+            window.setTimeout(() => window.location.reload(), 350);
+            return;
+          }
+          throw firstError;
         }
       }
+      sessionStorage.removeItem(`niver_push_repair:${window.location.origin}`);
       stage = 'salvamento da inscrição';
       const response = await fetch('/api/push/subscriptions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, subscription, preferences: nextPreferences }) });
       if (!response.ok) throw new Error('Não foi possível salvar a inscrição deste aparelho.');
@@ -129,6 +164,11 @@ export function PushControls() {
         `origem: ${window.location.origin}`,
         `PWA: ${isStandalone ? 'sim' : 'não'}`,
         `seguro: ${window.isSecureContext ? 'sim' : 'não'}`,
+        `online: ${navigator.onLine ? 'sim' : 'não'}`,
+        `chave VAPID: ${configFingerprint}`,
+        `worker: ${workerSummary(registration)}`,
+        `inscrição antes: ${hadSubscription ? 'sim' : 'não'}`,
+        `Chrome: ${(navigator.userAgent.match(/Chrome\/([0-9.]+)/)?.[1]) ?? 'não identificado'}`,
       ].join('\n'));
       const isApple = isIOS;
       const isPushServiceError = /push service|registration failed/i.test(rawMessage);
