@@ -11,7 +11,7 @@ const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
 export default function Profile() {
   const { session, saveSession } = useSession();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [name, setName] = useState(session?.name ?? '');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(session?.avatarUrl ?? null);
   const [avatarId, setAvatarId] = useState('star');
@@ -26,6 +26,13 @@ export default function Profile() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (!session) setLocation('/'); }, [session, setLocation]);
+  useEffect(() => {
+    if (!location.endsWith('#notificacoes')) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById('notificacoes')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [location]);
   if (!session) return null;
 
   const selectAvatarPhoto = async (event: ChangeEvent<HTMLInputElement>) => {

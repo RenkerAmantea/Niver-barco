@@ -1457,6 +1457,25 @@ export default async function handler(req, res) {
       });
     }
 
+    if (req.method === "GET" && path === "/invited-guests") {
+      const [guestsResponse, markersResponse] = await Promise.all([
+        rest("niver_barco_guests?select=*&order=created_at.asc"),
+        rest("niver_barco_posts?select=guest_id,content&order=created_at.asc"),
+      ]);
+      const [guests, markers] = await Promise.all([
+        readJson(guestsResponse),
+        readJson(markersResponse),
+      ]);
+      if (!guestsResponse.ok) return res.status(guestsResponse.status).json(guests);
+      if (!markersResponse.ok) return res.status(markersResponse.status).json(markers);
+      const invitedIds = new Set((markers ?? [])
+        .filter((marker) => inviteFromContent(marker.content))
+        .map((marker) => marker.guest_id));
+      return res.status(200).json((guests ?? [])
+        .filter((guest) => invitedIds.has(guest.id))
+        .map((guest) => guestResponse(guest)));
+    }
+
     if (req.method === "GET" && path === "/guests") {
       const [response, notesResponse] = await Promise.all([
         rest("niver_barco_guests?select=*&order=created_at.asc"),

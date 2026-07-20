@@ -76,7 +76,7 @@ export function NotificationBell() {
           <span className="min-w-0 flex-1"><span className="flex items-baseline justify-between gap-3"><strong className={`truncate text-sm ${notification.readAt ? 'font-medium text-white/65' : 'font-semibold text-white/95'}`}>{notification.title}</strong><time className="shrink-0 text-[10px] text-white/38">{relativeDate(notification.createdAt)}</time></span><span className="mt-1 block text-xs leading-5 text-white/55">{notification.body}</span></span>
         </button>)}
       </div>
-      <button type="button" onClick={() => { setOpen(false); setLocation('/perfil#notificacoes'); }} className="flex min-h-11 items-center justify-center gap-2 border-t border-white/10 text-xs font-semibold text-[#f9d98a] hover:bg-white/[.04]"><Settings2 className="h-3.5 w-3.5" />Configurar notificações</button>
+      <button type="button" onClick={() => { setOpen(false); setLocation('/perfil#notificacoes'); }} className="m-2 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#f9d98a]/25 bg-[#f6cc6b]/10 px-4 text-sm font-semibold text-[#ffe7a6] transition hover:bg-[#f6cc6b]/18"><Settings2 className="h-4 w-4" />Ajustar avisos</button>
     </section>}
   </div>;
 }

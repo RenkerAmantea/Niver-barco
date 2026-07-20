@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useSession } from "@/hooks/use-session";
 import { 
@@ -24,6 +24,16 @@ export default function Guests() {
   }, [session, setLocation]);
 
   const { data: guests, isLoading: isLoadingGuests } = useListGuests();
+  const [invited, setInvited] = useState<Guest[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/invited-guests')
+      .then((response) => response.ok ? response.json() : [])
+      .then((items) => { if (active) setInvited(Array.isArray(items) ? items : []); })
+      .catch(() => { if (active) setInvited([]); });
+    return () => { active = false; };
+  }, []);
 
   if (!session) return null;
 
@@ -93,15 +103,18 @@ export default function Guests() {
         </div>
         
         <Tabs defaultValue="going" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8 h-14 p-1.5 bg-black/40 border-white/5">
-            <TabsTrigger value="going" className="text-base h-full rounded-lg data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/30">
+          <TabsList className="grid w-full grid-cols-4 mb-8 h-14 p-1.5 bg-black/40 border-white/5">
+            <TabsTrigger value="going" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/30">
               Vou ✓ ({going.length})
             </TabsTrigger>
-            <TabsTrigger value="maybe" className="text-base h-full rounded-lg data-[state=active]:bg-secondary data-[state=active]:text-white">
+            <TabsTrigger value="maybe" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-secondary data-[state=active]:text-white">
               Talvez ? ({maybe.length})
             </TabsTrigger>
-            <TabsTrigger value="not_going" className="text-base h-full rounded-lg data-[state=active]:bg-destructive/20 data-[state=active]:text-destructive-foreground data-[state=active]:border data-[state=active]:border-destructive/30">
+            <TabsTrigger value="not_going" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-destructive/20 data-[state=active]:text-destructive-foreground data-[state=active]:border data-[state=active]:border-destructive/30">
               Não vou ✗ ({notGoing.length})
+            </TabsTrigger>
+            <TabsTrigger value="invited" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/25">
+              Convidados ({invited.length})
             </TabsTrigger>
           </TabsList>
           
@@ -113,6 +126,9 @@ export default function Guests() {
           </TabsContent>
           <TabsContent value="not_going" className="animate-in fade-in duration-500">
             {renderGuestList(notGoing, "Todos parecem dispostos a ir!")}
+          </TabsContent>
+          <TabsContent value="invited" className="animate-in fade-in duration-500">
+            {renderGuestList(invited, "Os convites personalizados aparecerão aqui.")}
           </TabsContent>
         </Tabs>
       </section>
