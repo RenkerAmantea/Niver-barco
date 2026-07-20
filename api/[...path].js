@@ -785,6 +785,39 @@ export default async function handler(req, res) {
         .json({ ...outcome, saved, subscribedDevices: records.length });
     }
 
+    // Conta de capitão criada antes do login por senha: permite definir a
+    // credencial uma única vez, sempre protegida pela autenticação do admin.
+    if (path === "/admin/captain-password") {
+      if (!(await authorizedAdmin(req)))
+        return res.status(401).json({ error: "Área administrativa protegida." });
+      if (req.method !== "POST") return res.status(405).end();
+      const captainId = Number(process.env.NIVER_CAPTAIN_GUEST_ID);
+      const password = req.body?.password;
+      if (!Number.isInteger(captainId) || captainId <= 0)
+        return res.status(500).json({ error: "Conta de capitão não configurada." });
+      if (!validPassword(password))
+        return res.status(400).json({ error: "A senha precisa ter pelo menos 4 caracteres." });
+      const markersResponse = await rest(
+        `niver_barco_posts?select=id,content&guest_id=eq.${captainId}`,
+      );
+      const markers = await readJson(markersResponse);
+      if (!markersResponse.ok)
+        return res.status(markersResponse.status).json(markers);
+      if ((markers ?? []).some((marker) => passwordFromContent(marker.content)))
+        return res.status(409).json({ error: "A conta de capitão já possui senha." });
+      const response = await rest("niver_barco_posts", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          guest_id: captainId,
+          content: `[[niver-password]]${JSON.stringify(passwordRecord(password))}`,
+        }),
+      });
+      return response.ok
+        ? res.status(200).json({ ok: true })
+        : res.status(response.status).json(await readJson(response));
+    }
+
     if (req.method === "GET" && path === "/admin/push/status") {
       if (!(await authorizedAdmin(req)))
         return res
