@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Anchor, CornerDownRight, Flame, Heart, Send, Sparkles } from 'lucide-react';
+import { Anchor, CornerDownRight, Flame, Heart, Send, ThumbsUp } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -8,13 +8,15 @@ import { useSession } from '@/hooks/use-session';
 import { getListPostsQueryKey, getListRepliesQueryKey, Post, Reply, useCreateReply, useListGuests, useListReplies } from '@workspace/api-client-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ReactionPeopleDialog } from '@/components/reaction-people-dialog';
 
-const reactionOptions = [{ key: 'heart', label: 'Coração', icon: Heart, color: 'fill-pink-400 text-pink-200' }, { key: 'fire', label: 'Fogo', icon: Flame, color: 'fill-orange-400 text-orange-100' }, { key: 'boat', label: 'Âncora', icon: Anchor, color: 'text-sky-100' }, { key: 'party', label: 'Brilho', icon: Sparkles, color: 'text-violet-200' }];
+const reactionOptions = [{ key: 'heart', label: 'Coração', icon: Heart, color: 'fill-pink-400 text-pink-200' }, { key: 'thumb', label: 'Joinha', icon: ThumbsUp, color: 'fill-sky-400 text-sky-200' }, { key: 'fire', label: 'Fogo', icon: Flame, color: 'fill-orange-400 text-orange-100' }, { key: 'boat', label: 'Âncora', icon: Anchor, color: 'fill-sky-400 text-sky-100' }];
 
 function ReplyReactionBar({ replyId, initial }: { replyId: number; initial: Array<{ emoji: string; guest_id: number }> }) {
-  const { session } = useSession(); const [reactions, setReactions] = useState(initial);
+  const { session } = useSession(); const { data: guests } = useListGuests(); const [reactions, setReactions] = useState(initial); const [peopleFor, setPeopleFor] = useState<string | null>(null);
   const toggle = async (emoji: string) => { if (!session?.id) return; const active = reactions.some((reaction) => reaction.emoji === emoji && reaction.guest_id === session.id); const response = await fetch(`/api/replies/${replyId}/reactions`, { method: active ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, emoji }) }); if (!response.ok) return; setReactions((current) => active ? current.filter((reaction) => !(reaction.emoji === emoji && reaction.guest_id === session.id)) : [...current, { emoji, guest_id: session.id }]); };
-  return <div className="mt-2 flex items-center gap-1">{reactionOptions.map(({ key, label, icon: Icon, color }) => { const count = reactions.filter((reaction) => reaction.emoji === key).length; const active = reactions.some((reaction) => reaction.emoji === key && reaction.guest_id === session?.id); return <button key={key} type="button" aria-label={`Reagir com ${label}`} aria-pressed={active} onClick={() => void toggle(key)} className={`inline-flex h-7 min-w-7 items-center justify-center gap-0.5 rounded-full border px-1.5 text-[10px] transition ${active ? 'border-primary/50 bg-primary/15' : 'border-white/10 bg-white/[.03] hover:bg-white/[.08]'}`}><Icon className={`h-3.5 w-3.5 ${color}`} />{count > 0 && <span>{count}</span>}</button>; })}</div>;
+  const selected = reactionOptions.find((reaction) => reaction.key === peopleFor);
+  return <><div className="mt-2 flex items-center gap-1">{reactionOptions.map(({ key, label, icon: Icon, color }) => { const count = reactions.filter((reaction) => reaction.emoji === key).length; const active = reactions.some((reaction) => reaction.emoji === key && reaction.guest_id === session?.id); return <div key={key} className={`inline-flex h-7 items-center ${count > 0 ? color : 'text-white/35'}`}><button type="button" aria-label={`Reagir com ${label}`} aria-pressed={active} onClick={() => void toggle(key)} className="grid h-7 w-6 place-items-center rounded-md transition hover:bg-white/[.055] hover:text-white/75"><Icon className={`h-3.5 w-3.5 ${count > 0 ? 'fill-current' : ''}`} /></button>{count > 0 && <button type="button" onClick={() => setPeopleFor(key)} aria-label={`Ver quem reagiu com ${label}`} className="pr-1 text-[10px] font-semibold transition-opacity hover:opacity-75">{count}</button>}</div>; })}</div>{selected && <ReactionPeopleDialog open={Boolean(peopleFor)} onOpenChange={(open) => !open && setPeopleFor(null)} emoji={selected.key} label={selected.label} Icon={selected.icon} reactions={reactions} guests={guests} />}</>;
 }
 
 export function PostReplies({ postId, replyTo }: { postId: number; replyTo?: string }) {

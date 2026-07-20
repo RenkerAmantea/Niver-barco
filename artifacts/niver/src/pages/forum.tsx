@@ -18,6 +18,7 @@ import { ptBR } from "date-fns/locale";
 import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Mic, Pause, Play, Square, ThumbsUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PostReplies } from "@/components/post-replies";
+import { ReactionPeopleDialog } from "@/components/reaction-people-dialog";
 
 const photoMarker = '[[niver-photo:';
 const audioMarker = '[[niver-audio:';
@@ -83,13 +84,16 @@ export const reactionOptions = [
   { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'fill-pink-400 text-pink-200' },
   { key: 'thumb', label: 'Joinha', icon: ThumbsUp, activeClass: 'fill-sky-400 text-sky-200' },
   { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'fill-orange-400 text-orange-100' },
-  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'text-sky-100' },
+  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'fill-sky-400 text-sky-100' },
 ];
 
 function ReactionBar({ postId, compact = false }: { postId: number; compact?: boolean }) {
   const { session } = useSession();
+  const { data: guests } = useListGuests();
   const [reactions, setReactions] = useState<Record<string, { count: number; reacted: boolean }>>({});
+  const [reactionList, setReactionList] = useState<Array<{ emoji: string; guest_id: number }>>([]);
   const [burst, setBurst] = useState<string | null>(null);
+  const [peopleFor, setPeopleFor] = useState<string | null>(null);
   const load = async () => {
     const response = await fetch(`/api/posts/${postId}/reactions`);
     if (!response.ok) return;
@@ -97,6 +101,7 @@ function ReactionBar({ postId, compact = false }: { postId: number; compact?: bo
     const mine = new Set((data.reactions ?? []).filter((item: { guest_id: number }) => item.guest_id === session?.id).map((item: { emoji: string }) => item.emoji));
     const next = Object.fromEntries(Object.entries(data.summary).map(([emoji, value]: [string, any]) => [emoji, { ...value, reacted: mine.has(emoji) }]));
     setReactions(next);
+    setReactionList(data.reactions ?? []);
   };
   useEffect(() => { void load(); }, [postId, session?.id]);
   const toggle = async (emoji: string) => {
@@ -106,11 +111,12 @@ function ReactionBar({ postId, compact = false }: { postId: number; compact?: bo
     if (!active) { setBurst(emoji); window.setTimeout(() => setBurst(null), 420); }
     void load();
   };
-  return <div className={cn("flex items-center gap-1", !compact && "flex-wrap pt-3")}>{reactionOptions.map(({ key, label, icon: Icon, activeClass }) => {
+  const selected = reactionOptions.find((reaction) => reaction.key === peopleFor);
+  return <><div className={cn("flex items-center gap-1", !compact && "flex-wrap pt-3")}>{reactionOptions.map(({ key, label, icon: Icon, activeClass }) => {
     const active = reactions[key]?.reacted;
     const count = reactions[key]?.count ?? 0;
-    return <button key={key} type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className={cn("inline-flex h-8 min-w-7 cursor-pointer items-center justify-center gap-1 rounded-lg px-1.5 text-white/35 transition-all hover:bg-white/[.055] hover:text-white/75", count > 0 && activeClass, burst === key && "reaction-burst")}><Icon className="h-4 w-4" />{count > 0 && <span className="text-[11px] font-semibold">{count}</span>}</button>;
-  })}</div>;
+    return <div key={key} className={cn("inline-flex h-8 items-center", count > 0 && activeClass, burst === key && "reaction-burst")}><button type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className="grid h-8 w-7 cursor-pointer place-items-center rounded-lg text-white/35 transition-all hover:bg-white/[.055] hover:text-white/75"><Icon className={cn("h-4 w-4", count > 0 && "fill-current")} /></button>{count > 0 && <button type="button" onClick={() => setPeopleFor(key)} aria-label={`Ver quem reagiu com ${label}`} className="min-w-4 pr-1 text-left text-[11px] font-semibold transition-opacity hover:opacity-75">{count}</button>}</div>;
+  })}</div>{selected && <ReactionPeopleDialog open={Boolean(peopleFor)} onOpenChange={(open) => !open && setPeopleFor(null)} emoji={selected.key} label={selected.label} Icon={selected.icon} reactions={reactionList} guests={guests} />}</>;
 }
 
 export default function Forum() {
