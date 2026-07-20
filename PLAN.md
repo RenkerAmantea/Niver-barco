@@ -140,3 +140,20 @@ Fase 6 concluída. Convite novo recebeu avatar persistido; convite legado sem av
 ## Estado atual
 
 Fase 7 concluída. Convites novos usam nome + 8 caracteres aleatórios (48 bits); “Copiado” só aparece depois do toque; convites antigos têm “Novo link”; e a lista privada separa convites ainda não abertos de contas pendentes comuns, sem duplicar. QA de API confirmou rotação (URL antiga 404, nova válida), avatar, limpeza dos testes e bundle idêntico nos dois aliases; QA visual mobile confirmou o fluxo de geração e cópia.
+
+### Fase 8: Ativação segura de convite e auditoria de push
+
+- [~] **T8.1** — Trocar a abertura automática do convite por uma tela de boas-vindas que cria a senha antes de ativar o perfil.
+  - Verificação: primeiro acesso não cria sessão sem senha; senha válida ativa o perfil; segundo acesso ao mesmo URL não revela nem entra no perfil.
+- [ ] **T8.2** — Ajustar o FAQ para encaminhar acompanhante ao link público normal com cópia fácil.
+  - Verificação: FAQ mostra o URL público e o botão copia com feedback.
+- [ ] **T8.3** — Encerrar o código privado em quatro dígitos com proteção anti-tentativa e revisar os links existentes.
+  - Verificação: novo link tem nome + quatro dígitos; tentativas excessivas são bloqueadas; links antigos continuam válidos até renovados.
+- [ ] **T8.4** — Auditar inscrições push e a contagem do admin, expondo diagnóstico privado e corrigindo o motivo de `0 aparelhos`.
+  - Verificação: painel mostra aparelhos inscritos; envio de teste retorna contagem consistente ou explica o bloqueio concreto.
+- [ ] **T8.5** — QA de API, desktop/mobile, produção e limpeza dos dados temporários.
+  - Verificação: build/typecheck passam; convite, FAQ e push passam em produção; aliases têm o mesmo bundle.
+
+## Estado atual
+
+Fase 8 em execução: convite individual deixa de criar uma sessão silenciosamente, o link fica compacto com defesa contra tentativas e o push ganha diagnóstico verificável.

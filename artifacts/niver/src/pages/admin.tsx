@@ -27,6 +27,12 @@ type LedgerGuest = {
 };
 type AdminPost = { id: number; guestName: string; content: string };
 type AdminPhoto = { path: string; url: string; guestName: string };
+type PushStatus = {
+  configured: boolean;
+  pairMatches: boolean;
+  subscribedDevices: number;
+  subscribedGuests: number;
+};
 const paymentLabel = {
   pending: "Pendente",
   paid: "Pago",
@@ -58,6 +64,7 @@ export default function Admin() {
   const [posts, setPosts] = useState<AdminPost[]>([]),
     [photos, setPhotos] = useState<AdminPhoto[]>([]),
     [removingContent, setRemovingContent] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
   const headers = () => ({
     "Content-Type": "application/json",
     ...(password ? { Authorization: `Bearer ${password}` } : {}),
@@ -68,17 +75,19 @@ export default function Admin() {
   const remember = () =>
     password && sessionStorage.setItem("niver_admin_password", password);
   const load = async () => {
-    const [a, b, c, d] = await Promise.all([
+    const [a, b, c, d, e] = await Promise.all([
       fetch("/api/admin/invites", { headers: headers() }),
       fetch("/api/admin/payments", { headers: headers() }),
       fetch("/api/posts"),
       fetch("/api/photos"),
+      fetch("/api/admin/push/status", { headers: headers() }),
     ]);
     if (!a.ok || !b.ok) return false;
     setInvites(await a.json());
     setLedger((await b.json()).guests);
     if (c.ok) setPosts(await c.json());
     if (d.ok) setPhotos(await d.json());
+    if (e.ok) setPushStatus(await e.json());
     return true;
   };
   useEffect(() => {
@@ -113,8 +122,9 @@ export default function Admin() {
     if (!r.ok) return setStatus(d.error ?? "Não foi possível enviar.");
     remember();
     setStatus(
-      `Aviso salvo para ${d.saved} convidado(s). Push entregue em ${d.sent} aparelho(s).`,
+      `Aviso salvo para ${d.saved} convidado(s). Push entregue em ${d.sent} de ${d.subscribedDevices} aparelho(s)${d.failed ? `; ${d.failed} falharam.` : "."}`,
     );
+    void load();
   };
   const copyInviteUrl = async (urlToCopy = lastCreatedUrl) => {
     if (!urlToCopy) return;
@@ -645,7 +655,25 @@ export default function Admin() {
             onSubmit={send}
             className="glass-card space-y-5 rounded-3xl p-5 sm:p-7"
           >
-            <h2 className="font-display text-xl font-bold">Notificações</h2>
+            <div>
+              <h2 className="font-display text-xl font-bold">Notificações</h2>
+              {pushStatus ? (
+                <p
+                  className={`mt-1 text-xs ${pushStatus.subscribedDevices > 0 ? "text-emerald-200" : "text-amber-100/75"}`}
+                >
+                  {pushStatus.configured && pushStatus.pairMatches
+                    ? `${pushStatus.subscribedDevices} aparelho(s) ativo(s) em ${pushStatus.subscribedGuests} perfil(is).`
+                    : "A configuração de push do servidor precisa de atenção."}
+                  {pushStatus.subscribedDevices === 0
+                    ? " Ninguém está inscrito neste momento; peça para ativarem os avisos no app."
+                    : ""}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Conferindo aparelhos inscritos…
+                </p>
+              )}
+            </div>
             <label className="block text-sm font-medium">
               Título
               <input

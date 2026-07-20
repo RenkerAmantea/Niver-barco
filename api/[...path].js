@@ -3,6 +3,7 @@ import {
   createHash,
   createECDH,
   randomBytes,
+  randomInt,
   scryptSync,
   timingSafeEqual,
 } from "node:crypto";
@@ -290,10 +291,29 @@ function inviteSlug(name) {
 }
 
 function inviteToken(name) {
-  // 48 bits of randomness keeps the URL compact and still makes guessing a
-  // private invitation impractical. A four-digit numeric token would be a
-  // credential with only 10,000 possibilities.
-  return `${inviteSlug(name)}-${randomBytes(6).toString("base64url")}`;
+  // Para este evento pequeno, o nome já diferencia cada convite. O código de
+  // quatro dígitos deixa o link legível; as tentativas de abertura recebem
+  // limite abaixo para evitar varredura casual.
+  return `${inviteSlug(name)}-${randomInt(1000, 10000)}`;
+}
+
+const inviteAttemptWindows = new Map();
+
+function inviteAttemptAllowed(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const address =
+    typeof forwarded === "string"
+      ? forwarded.split(",")[0].trim()
+      : req.socket?.remoteAddress || "unknown";
+  const now = Date.now();
+  const previous = inviteAttemptWindows.get(address);
+  if (!previous || now - previous.startedAt > 10 * 60 * 1000) {
+    inviteAttemptWindows.set(address, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (previous.count >= 15) return false;
+  previous.count += 1;
+  return true;
 }
 
 function unclaimedInviteGuestIds(posts) {
@@ -737,6 +757,31 @@ export default async function handler(req, res) {
         .json({ ...outcome, saved, subscribedDevices: records.length });
     }
 
+    if (req.method === "GET" && path === "/admin/push/status") {
+      if (!(await authorizedAdmin(req)))
+        return res
+          .status(401)
+          .json({ error: "Área administrativa protegida." });
+      const records = await pushSubscriptions();
+      return res.status(200).json({
+        configured: Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY),
+        pairMatches: vapidPairMatches(),
+        subscribedDevices: records.length,
+        subscribedGuests: new Set(records.map((record) => record.guestId)).size,
+        subscriptions: records.map((record) => ({
+          guestId: record.guestId,
+          endpointHost: (() => {
+            try {
+              return new URL(record.subscription.endpoint).host;
+            } catch {
+              return "inválido";
+            }
+          })(),
+          preferences: record.preferences ?? {},
+        })),
+      });
+    }
+
     if (path === "/admin/invites") {
       if (!(await authorizedAdmin(req)))
         return res
@@ -906,9 +951,18 @@ export default async function handler(req, res) {
     }
 
     const inviteMatch = path.match(/^\/invites\/([^/]+)$/);
-    if (inviteMatch && req.method === "GET") {
-      const token = decodeURIComponent(inviteMatch[1]);
-      if (token.length < 10)
+    const inviteClaimMatch = path.match(/^\/invites\/([^/]+)\/claim$/);
+    if (
+      (inviteMatch && req.method === "GET") ||
+      (inviteClaimMatch && req.method === "POST")
+    ) {
+      if (!inviteAttemptAllowed(req))
+        return res.status(429).json({
+          error:
+            "Muitas tentativas neste aparelho. Aguarde alguns minutos antes de tentar de novo.",
+        });
+      const token = decodeURIComponent((inviteMatch ?? inviteClaimMatch)[1]);
+      if (token.length < 6)
         return res.status(404).json({ error: "Convite não encontrado." });
       const markersResponse = await rest(
         "niver_barco_posts?select=id,guest_id,content",
@@ -929,22 +983,11 @@ export default async function handler(req, res) {
       const guests = await readJson(invitedGuestResponse);
       if (!invitedGuestResponse.ok || !guests?.[0])
         return res.status(404).json({ error: "Convidado não encontrado." });
-      if (!invite.claimedAt) {
-        const claimedAt = new Date().toISOString();
-        const content = `[[niver-invite]]${JSON.stringify({ ...invite, claimedAt })}`;
-        const claimResponse = await rest(
-          `niver_barco_posts?id=eq.${marker.id}`,
-          {
-            method: "PATCH",
-            headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ content }),
-          },
-        );
-        if (!claimResponse.ok)
-          return res
-            .status(claimResponse.status)
-            .json(await readJson(claimResponse));
-      }
+      if (invite.claimedAt)
+        return res.status(409).json({
+          error:
+            "Este convite já foi ativado. Entre pela página inicial usando o nome e a senha escolhidos pela pessoa convidada.",
+        });
       let invitedGuest = guests[0];
       if (!invitedGuest.avatar_url) {
         const avatar_url = defaultAvatarUrl(invitedGuest.name);
@@ -958,6 +1001,55 @@ export default async function handler(req, res) {
         );
         const updated = await readJson(avatarResponse);
         if (avatarResponse.ok && updated?.[0]) invitedGuest = updated[0];
+      }
+      if (req.method === "GET")
+        return res.status(200).json({
+          id: invitedGuest.id,
+          name: invitedGuest.name,
+          avatarUrl: invitedGuest.avatar_url ?? null,
+        });
+
+      const password = req.body?.password;
+      if (!validPassword(password))
+        return res
+          .status(400)
+          .json({ error: "Crie uma senha de pelo menos 4 caracteres." });
+      const existingPassword = (markers ?? [])
+        .filter((item) => item.guest_id === marker.guest_id)
+        .map((item) => passwordFromContent(item.content))
+        .find(Boolean);
+      if (existingPassword)
+        return res.status(409).json({
+          error:
+            "Este convite já foi ativado. Entre pela página inicial com nome e senha.",
+        });
+      const passwordResponse = await rest("niver_barco_posts", {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          guest_id: invitedGuest.id,
+          content: `[[niver-password]]${JSON.stringify(passwordRecord(password))}`,
+        }),
+      });
+      const passwordMarkers = await readJson(passwordResponse);
+      const passwordMarker = passwordMarkers?.[0];
+      if (!passwordResponse.ok || !passwordMarker)
+        return res.status(passwordResponse.status).json(passwordMarkers);
+      const claimedAt = new Date().toISOString();
+      const claimResponse = await rest(`niver_barco_posts?id=eq.${marker.id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          content: `[[niver-invite]]${JSON.stringify({ ...invite, claimedAt })}`,
+        }),
+      });
+      if (!claimResponse.ok) {
+        await rest(`niver_barco_posts?id=eq.${passwordMarker.id}`, {
+          method: "DELETE",
+        });
+        return res
+          .status(claimResponse.status)
+          .json(await readJson(claimResponse));
       }
       const adminMarkerResponse = await rest(
         `niver_barco_posts?select=content&guest_id=eq.${marker.guest_id}`,
