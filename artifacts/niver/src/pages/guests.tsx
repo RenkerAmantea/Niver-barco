@@ -105,7 +105,7 @@ export default function Guests() {
             <TabsTrigger value="not_going" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-destructive/20 data-[state=active]:text-destructive-foreground data-[state=active]:border data-[state=active]:border-destructive/30">
               Não vou ✗ ({notGoing.length})
             </TabsTrigger>
-            <TabsTrigger value="invited" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:border data-[state=active]:border-amber-300/45 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-100">
+            <TabsTrigger value="invited" className="h-full rounded-lg text-[11px] sm:text-xs data-[state=active]:border data-[state=active]:border-amber-300/45 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-100">
               Aguardando ({invited.length})
             </TabsTrigger>
           </TabsList>
