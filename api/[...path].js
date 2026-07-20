@@ -637,8 +637,10 @@ export default async function handler(req, res) {
       }
       const preferences = {
         announcements: true,
+        posts: true,
         mentions: true,
         replies: true,
+        threadActivity: true,
         photos: true,
         ...(req.body?.preferences ?? {}),
       };
@@ -1760,13 +1762,12 @@ export default async function handler(req, res) {
       const allGuestsResponse = await rest("niver_barco_guests?select=id,name");
       const allGuests = await readJson(allGuestsResponse);
       const photo = parsePhotoPost(content);
-      const targetIds = photo
-        ? (allGuests ?? [])
-            .filter((guest) => guest.id !== guestId)
-            .map((guest) => guest.id)
-        : mentionedGuestIds(content, allGuests ?? []).filter(
-            (id) => id !== guestId,
-          );
+      const mentionedIds = photo
+        ? []
+        : mentionedGuestIds(content, allGuests ?? []).filter((id) => id !== guestId);
+      const targetIds = (allGuests ?? [])
+        .map((guest) => guest.id)
+        .filter((id) => id !== guestId && (photo || !mentionedIds.includes(id)));
       const notification = photo
         ? {
             title: "Nova foto a bordo",
@@ -1776,14 +1777,25 @@ export default async function handler(req, res) {
             preference: "photos",
           }
         : {
-            title: "Você foi marcado no mural",
-            body: `${guests?.[0]?.name ?? "Alguém"} te marcou: ${content.slice(0, 120)}`,
+            title: "Nova postagem no mural",
+            body: `${guests?.[0]?.name ?? "Alguém"} publicou: ${content.slice(0, 120)}`,
             url: `/forum#post-${posts[0].id}`,
-            tag: `mention-${posts[0].id}`,
-            preference: "mentions",
+            tag: `post-${posts[0].id}`,
+            preference: "posts",
           };
       await createNotifications(targetIds, notification);
       await sendPushToGuests(targetIds, notification);
+      if (mentionedIds.length) {
+        const mentionNotification = {
+          title: "Você foi marcado no mural",
+          body: `${guests?.[0]?.name ?? "Alguém"} te marcou: ${content.slice(0, 120)}`,
+          url: `/forum#post-${posts[0].id}`,
+          tag: `mention-${posts[0].id}`,
+          preference: "mentions",
+        };
+        await createNotifications(mentionedIds, mentionNotification);
+        await sendPushToGuests(mentionedIds, mentionNotification);
+      }
       return res.status(201).json(postResponse(posts[0], guests, []));
     }
 
@@ -1839,29 +1851,54 @@ export default async function handler(req, res) {
           `niver_barco_guests?select=*&id=eq.${guestId}`,
         );
         const guests = await readJson(guestsResponse);
-        const [postOwnerResponse, allGuestsResponse] = await Promise.all([
+        const [postOwnerResponse, allGuestsResponse, existingRepliesResponse] = await Promise.all([
           rest(`niver_barco_posts?select=guest_id&id=eq.${postId}`),
           rest("niver_barco_guests?select=id,name"),
+          rest(`niver_barco_replies?select=guest_id&post_id=eq.${postId}`),
         ]);
-        const [postOwner, allGuests] = await Promise.all([
+        const [postOwner, allGuests, existingReplies] = await Promise.all([
           readJson(postOwnerResponse),
           readJson(allGuestsResponse),
+          readJson(existingRepliesResponse),
         ]);
-        const targetIds = [
-          ...new Set([
-            postOwner?.[0]?.guest_id,
-            ...mentionedGuestIds(content, allGuests ?? []),
-          ]),
-        ].filter((id) => id && id !== guestId);
-        const notification = {
+        const postOwnerId = postOwner?.[0]?.guest_id;
+        const mentionTargetIds = mentionedGuestIds(content, allGuests ?? [])
+          .filter((id) => id && id !== guestId && id !== postOwnerId);
+        const directTargetIds = postOwnerId && postOwnerId !== guestId
+          ? [postOwnerId]
+          : [];
+        const directNotification = {
           title: "Nova resposta no mural",
           body: `${guests?.[0]?.name ?? "Alguém"} respondeu: ${content.slice(0, 120)}`,
           url: `/forum#post-${postId}`,
           tag: `reply-${replies[0].id}`,
           preference: "replies",
         };
-        await createNotifications(targetIds, notification);
-        await sendPushToGuests(targetIds, notification);
+        const watcherIds = [...new Set((existingReplies ?? [])
+          .map((reply) => reply.guest_id)
+          .filter((id) => id && id !== guestId && !directTargetIds.includes(id) && !mentionTargetIds.includes(id)))];
+        const watcherNotification = {
+          title: "Conversa atualizada no mural",
+          body: `${guests?.[0]?.name ?? "Alguém"} respondeu em uma conversa que você comentou.`,
+          url: `/forum#post-${postId}`,
+          tag: `thread-${postId}`,
+          preference: "threadActivity",
+        };
+        await createNotifications(directTargetIds, directNotification);
+        await sendPushToGuests(directTargetIds, directNotification);
+        if (mentionTargetIds.length) {
+          const mentionNotification = {
+            title: "Você foi marcado no mural",
+            body: `${guests?.[0]?.name ?? "Alguém"} te marcou em uma resposta: ${content.slice(0, 120)}`,
+            url: `/forum#post-${postId}`,
+            tag: `mention-reply-${replies[0].id}`,
+            preference: "mentions",
+          };
+          await createNotifications(mentionTargetIds, mentionNotification);
+          await sendPushToGuests(mentionTargetIds, mentionNotification);
+        }
+        await createNotifications(watcherIds, watcherNotification);
+        await sendPushToGuests(watcherIds, watcherNotification);
         return res.status(201).json(replyResponse(replies[0], guests));
       }
     }
