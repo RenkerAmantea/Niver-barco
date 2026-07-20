@@ -9,9 +9,7 @@ import {
 } from "@workspace/api-client-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { PresenceCard } from '@/components/presence-card';
-import { MessageSquare } from "lucide-react";
 
 export default function Guests() {
   const { session } = useSession();
@@ -89,12 +87,6 @@ export default function Guests() {
       
       {/* User RSVP Action Area */}
       <section><PresenceCard /></section>
-
-      <section className="flex justify-center -mt-4">
-        <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10" onClick={() => setLocation("/forum")}>
-          <MessageSquare className="mr-2 h-4 w-4" /> Abrir mural e bate-papo
-        </Button>
-      </section>
 
       {/* Guest List Tabs */}
       <section>
