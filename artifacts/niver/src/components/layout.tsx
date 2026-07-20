@@ -8,6 +8,7 @@ import { PresenceCard } from './presence-card';
 import { PwaControls } from './pwa-controls';
 import { NotificationBell } from './notification-bell';
 import { PushControls } from './push-controls';
+import { AnnouncementModal } from './announcement-modal';
 import { useGetGuest, GuestRsvpStatus, getGetGuestQueryKey } from '@workspace/api-client-react';
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -73,6 +74,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {navLinks.map(({ href, label, icon: Icon, featured }) => <Link key={href} href={href} aria-current={location === href ? 'page' : undefined} className={cn('bottom-nav-item', featured && 'bottom-nav-item-center')}><Icon className="bottom-nav-icon" /> <span className="bottom-nav-label">{label}</span></Link>)}
       </nav>}
       <PwaControls />
+      {session && <AnnouncementModal />}
       {showPushNudge && <div className="fixed inset-0 z-[75] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div role="dialog" aria-modal="true" aria-label="Configurar avisos do barco" className="relative w-full max-w-md space-y-3"><button type="button" onClick={dismissPushNudge} aria-label="Fechar avisos" className="absolute -right-1 -top-1 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/12 bg-[#101126]/95 text-white/60 shadow-lg transition hover:border-primary/35 hover:text-primary"><X className="h-4 w-4" /></button><PushControls /><button type="button" onClick={dismissPushNudge} className="premium-cta shimmer mx-auto flex min-h-11 items-center justify-center rounded-xl border border-[#fff0b4]/60 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] px-8 text-sm font-semibold text-[#150d05]">Pronto</button></div></div>}
       {session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados' && <div className="fixed inset-0 z-[70] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md"><PresenceCard /></div></div>}
     </div>

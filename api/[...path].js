@@ -221,6 +221,88 @@ function notificationFromContent(content) {
   }
 }
 
+function announcementFromContent(content) {
+  const match =
+    typeof content === "string" &&
+    content.match(/^\[\[niver-announcement\]\](.+)$/s);
+  if (!match) return null;
+  try {
+    const announcement = JSON.parse(match[1]);
+    const title = typeof announcement?.title === "string" ? announcement.title.trim() : "";
+    const body = typeof announcement?.body === "string" ? announcement.body.trim() : "";
+    const pollOptions = Array.isArray(announcement?.pollOptions)
+      ? announcement.pollOptions
+          .filter((option) => typeof option === "string")
+          .map((option) => option.trim())
+          .filter(Boolean)
+          .slice(0, 4)
+      : [];
+    if (!title || !body || (pollOptions.length > 0 && pollOptions.length < 2)) return null;
+    return {
+      title: title.slice(0, 80),
+      body: body.slice(0, 240),
+      pollOptions,
+      active: announcement.active !== false,
+      createdAt: typeof announcement.createdAt === "string" ? announcement.createdAt : null,
+      closedAt: typeof announcement.closedAt === "string" ? announcement.closedAt : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function announcementDismissalFromContent(content) {
+  const match =
+    typeof content === "string" &&
+    content.match(/^\[\[niver-announcement-dismissed:(\d+)\]\]$/);
+  return match ? { announcementId: Number(match[1]) } : null;
+}
+
+function pollVoteFromContent(content) {
+  const match =
+    typeof content === "string" &&
+    content.match(/^\[\[niver-poll-vote:(\d+):(\d+)\]\]$/);
+  return match
+    ? { announcementId: Number(match[1]), optionIndex: Number(match[2]) }
+    : null;
+}
+
+function announcementList(records, guestId = null) {
+  const dismissals = new Set();
+  const votes = new Map();
+  for (const record of records ?? []) {
+    const dismissal = announcementDismissalFromContent(record.content);
+    if (dismissal && Number(record.guest_id) === Number(guestId))
+      dismissals.add(dismissal.announcementId);
+    const vote = pollVoteFromContent(record.content);
+    if (vote) {
+      if (!votes.has(vote.announcementId)) votes.set(vote.announcementId, new Map());
+      votes.get(vote.announcementId).set(record.guest_id, vote.optionIndex);
+    }
+  }
+  return (records ?? [])
+    .flatMap((record) => {
+      const announcement = announcementFromContent(record.content);
+      if (!announcement) return [];
+      const announcementVotes = votes.get(record.id) ?? new Map();
+      const voteCounts = announcement.pollOptions.map(
+        (_, index) => [...announcementVotes.values()].filter((value) => value === index).length,
+      );
+      return [{
+        id: record.id,
+        ...announcement,
+        createdAt: announcement.createdAt ?? record.created_at ?? null,
+        dismissed: guestId ? dismissals.has(record.id) : false,
+        myVote: guestId ? (announcementVotes.get(Number(guestId)) ?? null) : null,
+        voteCounts,
+        totalVotes: [...announcementVotes.values()].filter(
+          (value) => value >= 0 && value < announcement.pollOptions.length,
+        ).length,
+      }];
+    })
+    .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")));
+}
+
 function inviteFromContent(content) {
   const match =
     typeof content === "string" && content.match(/^\[\[niver-invite\]\](.+)$/s);
@@ -358,6 +440,9 @@ function isPrivateMarker(content) {
     pushSubscriptionFromContent(content) !== null ||
     passwordFromContent(content) !== null ||
     notificationFromContent(content) !== null ||
+    announcementFromContent(content) !== null ||
+    announcementDismissalFromContent(content) !== null ||
+    pollVoteFromContent(content) !== null ||
     inviteFromContent(content) !== null ||
     adminMarkerFromContent(content) ||
     paymentFromContent(content) !== null ||
@@ -739,6 +824,172 @@ export default async function handler(req, res) {
       return response.ok
         ? res.status(200).json({ ok: true, readAt })
         : res.status(response.status).json(await readJson(response));
+    }
+
+    if (req.method === "GET" && path === "/announcements") {
+      const guestId = Number(
+        new URL(req.url, "https://app.local").searchParams.get("guestId"),
+      );
+      if (!Number.isInteger(guestId))
+        return res.status(400).json({ error: "Convidado inválido." });
+      const response = await rest(
+        "niver_barco_posts?select=id,guest_id,content,created_at&order=created_at.desc",
+      );
+      const records = await readJson(response);
+      if (!response.ok) return res.status(response.status).json(records);
+      return res.status(200).json({
+        announcements: announcementList(records, guestId).filter((item) => item.active),
+      });
+    }
+
+    const announcementDismissMatch = path.match(/^\/announcements\/(\d+)\/dismiss$/);
+    if (announcementDismissMatch && req.method === "POST") {
+      const announcementId = Number(announcementDismissMatch[1]);
+      const guestId = Number(req.body?.guestId);
+      if (!Number.isInteger(announcementId) || !Number.isInteger(guestId))
+        return res.status(400).json({ error: "Comunicado inválido." });
+      const response = await rest(
+        `niver_barco_posts?select=id,guest_id,content&id=eq.${announcementId}`,
+      );
+      const records = await readJson(response);
+      if (!response.ok) return res.status(response.status).json(records);
+      if (!announcementFromContent(records?.[0]?.content))
+        return res.status(404).json({ error: "Comunicado não encontrado." });
+      const markersResponse = await rest(
+        `niver_barco_posts?select=id,content&guest_id=eq.${guestId}`,
+      );
+      const markers = await readJson(markersResponse);
+      if (!markersResponse.ok) return res.status(markersResponse.status).json(markers);
+      if (!(markers ?? []).some((marker) => announcementDismissalFromContent(marker.content)?.announcementId === announcementId)) {
+        const saved = await rest("niver_barco_posts", {
+          method: "POST",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({
+            guest_id: guestId,
+            content: `[[niver-announcement-dismissed:${announcementId}]]`,
+          }),
+        });
+        if (!saved.ok) return res.status(saved.status).json(await readJson(saved));
+      }
+      return res.status(200).json({ ok: true });
+    }
+
+    const announcementVoteMatch = path.match(/^\/announcements\/(\d+)\/vote$/);
+    if (announcementVoteMatch && req.method === "POST") {
+      const announcementId = Number(announcementVoteMatch[1]);
+      const guestId = Number(req.body?.guestId);
+      const optionIndex = Number(req.body?.optionIndex);
+      if (!Number.isInteger(announcementId) || !Number.isInteger(guestId) || !Number.isInteger(optionIndex))
+        return res.status(400).json({ error: "Voto inválido." });
+      const allResponse = await rest(
+        "niver_barco_posts?select=id,guest_id,content,created_at&order=created_at.desc",
+      );
+      const records = await readJson(allResponse);
+      if (!allResponse.ok) return res.status(allResponse.status).json(records);
+      const announcement = announcementList(records, guestId).find((item) => item.id === announcementId);
+      if (!announcement || !announcement.active)
+        return res.status(404).json({ error: "Enquete não encontrada ou encerrada." });
+      if (!announcement.pollOptions.length || optionIndex < 0 || optionIndex >= announcement.pollOptions.length)
+        return res.status(400).json({ error: "Opção de enquete inválida." });
+      for (const record of records ?? []) {
+        const vote = pollVoteFromContent(record.content);
+        if (Number(record.guest_id) === guestId && vote?.announcementId === announcementId)
+          await rest(`niver_barco_posts?id=eq.${record.id}`, { method: "DELETE" });
+      }
+      const saved = await rest("niver_barco_posts", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          guest_id: guestId,
+          content: `[[niver-poll-vote:${announcementId}:${optionIndex}]]`,
+        }),
+      });
+      if (!saved.ok) return res.status(saved.status).json(await readJson(saved));
+      const refreshed = await rest(
+        "niver_barco_posts?select=id,guest_id,content,created_at&order=created_at.desc",
+      );
+      const refreshedRecords = await readJson(refreshed);
+      if (!refreshed.ok) return res.status(refreshed.status).json(refreshedRecords);
+      return res.status(200).json({
+        announcement: announcementList(refreshedRecords, guestId).find((item) => item.id === announcementId),
+      });
+    }
+
+    if (path === "/admin/announcements") {
+      if (!(await authorizedAdmin(req)))
+        return res.status(401).json({ error: "Área administrativa protegida." });
+      if (req.method === "GET") {
+        const response = await rest(
+          "niver_barco_posts?select=id,guest_id,content,created_at&order=created_at.desc",
+        );
+        const records = await readJson(response);
+        return response.ok
+          ? res.status(200).json({ announcements: announcementList(records) })
+          : res.status(response.status).json(records);
+      }
+      if (req.method !== "POST") return res.status(405).end();
+      const title = typeof req.body?.title === "string" ? req.body.title.trim().slice(0, 80) : "";
+      const body = typeof req.body?.body === "string" ? req.body.body.trim().slice(0, 240) : "";
+      const pollOptions = Array.isArray(req.body?.pollOptions)
+        ? req.body.pollOptions.filter((option) => typeof option === "string").map((option) => option.trim().slice(0, 50)).filter(Boolean).slice(0, 4)
+        : [];
+      if (!title || !body || (pollOptions.length > 0 && pollOptions.length < 2))
+        return res.status(400).json({ error: "Preencha título, mensagem e ao menos duas opções válidas para a enquete." });
+      const captainId = Number(process.env.NIVER_CAPTAIN_GUEST_ID);
+      if (!Number.isInteger(captainId) || captainId <= 0)
+        return res.status(500).json({ error: "Conta de capitão não configurada." });
+      const announcement = { title, body, pollOptions, active: true, createdAt: new Date().toISOString() };
+      const savedResponse = await rest("niver_barco_posts", {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ guest_id: captainId, content: `[[niver-announcement]]${JSON.stringify(announcement)}` }),
+      });
+      const savedRecords = await readJson(savedResponse);
+      const saved = savedRecords?.[0];
+      if (!savedResponse.ok || !saved)
+        return res.status(savedResponse.status).json(savedRecords);
+      const guestsResponse = await rest("niver_barco_guests?select=id");
+      const guests = await readJson(guestsResponse);
+      if (!guestsResponse.ok) return res.status(guestsResponse.status).json(guests);
+      const guestIds = (guests ?? []).map((guest) => guest.id);
+      const notification = { title, body, url: "/evento" };
+      const notificationCount = await createNotifications(guestIds, notification);
+      const outcome = await sendPushToGuests(guestIds, {
+        ...notification,
+        tag: `announcement-${saved.id}`,
+        preference: "announcements",
+      });
+      return res.status(201).json({
+        announcement: announcementList([saved])[0],
+        saved: notificationCount,
+        ...outcome,
+      });
+    }
+
+    const adminAnnouncementMatch = path.match(/^\/admin\/announcements\/(\d+)$/);
+    if (adminAnnouncementMatch && req.method === "PATCH") {
+      if (!(await authorizedAdmin(req)))
+        return res.status(401).json({ error: "Área administrativa protegida." });
+      const announcementId = Number(adminAnnouncementMatch[1]);
+      const response = await rest(
+        `niver_barco_posts?select=id,content&id=eq.${announcementId}`,
+      );
+      const records = await readJson(response);
+      const current = records?.[0];
+      const announcement = announcementFromContent(current?.content);
+      if (!response.ok) return res.status(response.status).json(records);
+      if (!announcement) return res.status(404).json({ error: "Comunicado não encontrado." });
+      const active = req.body?.active !== false;
+      const updated = { ...announcement, active, closedAt: active ? null : new Date().toISOString() };
+      const saved = await rest(`niver_barco_posts?id=eq.${announcementId}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ content: `[[niver-announcement]]${JSON.stringify(updated)}` }),
+      });
+      const savedRecords = await readJson(saved);
+      return saved.ok
+        ? res.status(200).json({ announcement: announcementList(savedRecords)[0] })
+        : res.status(saved.status).json(savedRecords);
     }
 
     if (path === "/admin/notify") {

@@ -199,7 +199,7 @@ export default function Event() {
             />
           </div>
           <a
-            href="https://www.google.com/searchviewer/10?svid=CAwSHRIbCgNwdnESFENnMHZaeTh4TVdka2VXbzJNbnA1GAo"
+            href="https://www.google.com.br/maps/place/O+Rei+do+Camar%C3%A3o+Beira+Lago/@-15.7855671,-47.8362295,16.25z/data=!4m6!3m5!1s0x935a3c9814475e9f:0xda0044d682b3c194!8m2!3d-15.7862234!4d-47.8338228!16s%2Fg%2F11gdyj62zy?entry=ttu&g_ep=EgoyMDI2MDcxNS4wIKXMDSoASAFQAw%3D%3D"
             target="_blank"
             rel="noreferrer"
             className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary transition hover:text-[#ffe29b]"

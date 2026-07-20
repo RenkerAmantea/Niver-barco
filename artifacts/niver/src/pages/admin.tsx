@@ -9,6 +9,9 @@ import {
   Shield,
   Trash2,
   UserPlus,
+  BellRing,
+  Vote,
+  X,
 } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 
@@ -34,6 +37,15 @@ type PushStatus = {
   pairMatches: boolean;
   subscribedDevices: number;
   subscribedGuests: number;
+};
+type AdminAnnouncement = {
+  id: number;
+  title: string;
+  body: string;
+  pollOptions: string[];
+  active: boolean;
+  totalVotes: number;
+  createdAt: string | null;
 };
 const paymentLabel = {
   pending: "Pendente",
@@ -68,6 +80,13 @@ export default function Admin() {
     [photos, setPhotos] = useState<AdminPhoto[]>([]),
     [removingContent, setRemovingContent] = useState<string | null>(null);
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
+  const [adminTab, setAdminTab] = useState<"avisos" | "operação" | "convites" | "conteúdo">("avisos");
+  const [announcements, setAnnouncements] = useState<AdminAnnouncement[]>([]);
+  const [announcementTitle, setAnnouncementTitle] = useState(""),
+    [announcementBody, setAnnouncementBody] = useState(""),
+    [pollOptions, setPollOptions] = useState<string[]>(["", ""]),
+    [announcementStatus, setAnnouncementStatus] = useState(""),
+    [closingAnnouncementId, setClosingAnnouncementId] = useState<number | null>(null);
   const headers = () => ({
     "Content-Type": "application/json",
     ...(password ? { Authorization: `Bearer ${password}` } : {}),
@@ -78,12 +97,13 @@ export default function Admin() {
   const remember = () =>
     password && sessionStorage.setItem("niver_admin_password", password);
   const load = async () => {
-    const [a, b, c, d, e] = await Promise.all([
+    const [a, b, c, d, e, f] = await Promise.all([
       fetch("/api/admin/invites", { headers: headers() }),
       fetch("/api/admin/payments", { headers: headers() }),
       fetch("/api/posts"),
       fetch("/api/photos"),
       fetch("/api/admin/push/status", { headers: headers() }),
+      fetch("/api/admin/announcements", { headers: headers() }),
     ]);
     if (!a.ok || !b.ok) return false;
     setInvites(await a.json());
@@ -91,6 +111,7 @@ export default function Admin() {
     if (c.ok) setPosts(await c.json());
     if (d.ok) setPhotos(await d.json());
     if (e.ok) setPushStatus(await e.json());
+    if (f.ok) setAnnouncements((await f.json()).announcements ?? []);
     return true;
   };
   useEffect(() => {
@@ -128,6 +149,34 @@ export default function Admin() {
       `Aviso salvo para ${d.saved} convidado(s). Push entregue em ${d.sent} de ${d.subscribedDevices} aparelho(s)${d.failed ? `; ${d.failed} falharam.` : "."}`,
     );
     void load();
+  };
+  const publishAnnouncement = async (e: FormEvent) => {
+    e.preventDefault();
+    setAnnouncementStatus("Publicando comunicado…");
+    const response = await fetch("/api/admin/announcements", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ title: announcementTitle, body: announcementBody, pollOptions: pollOptions.filter(Boolean) }),
+    });
+    const data = await response.json();
+    if (!response.ok) return setAnnouncementStatus(data.error ?? "Não foi possível publicar o comunicado.");
+    setAnnouncementTitle("");
+    setAnnouncementBody("");
+    setPollOptions(["", ""]);
+    setAnnouncementStatus(`Comunicado publicado. Push entregue em ${data.sent} aparelho(s).`);
+    await load();
+  };
+  const closeAnnouncement = async (id: number) => {
+    setClosingAnnouncementId(id);
+    const response = await fetch(`/api/admin/announcements/${id}`, {
+      method: "PATCH",
+      headers: headers(),
+      body: JSON.stringify({ active: false }),
+    });
+    const data = await response.json();
+    if (!response.ok) setAnnouncementStatus(data.error ?? "Não foi possível encerrar o comunicado.");
+    else setAnnouncements((items) => items.map((item) => item.id === id ? { ...item, active: false } : item));
+    setClosingAnnouncementId(null);
   };
   const copyInviteUrl = async (urlToCopy = lastCreatedUrl) => {
     if (!urlToCopy) return;
@@ -329,7 +378,15 @@ export default function Admin() {
       )}
       {canUseAdmin && (
         <>
-          <section className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
+          <nav aria-label="Seções da administração" className="grid grid-cols-4 rounded-2xl border border-white/10 bg-black/20 p-1 text-[10px] font-bold uppercase tracking-[.08em] sm:text-xs">
+            {([
+              ["avisos", "Avisos", BellRing],
+              ["operação", "Operação", Shield],
+              ["convites", "Convites", Link2],
+              ["conteúdo", "Conteúdo", Trash2],
+            ] as const).map(([key, label, Icon]) => <button key={key} type="button" onClick={() => setAdminTab(key)} className={`flex min-h-10 min-w-0 items-center justify-center gap-1 rounded-xl px-1 transition ${adminTab === key ? "bg-[#dcae42]/18 text-[#ffe39a] shadow-[inset_0_1px_0_rgba(255,255,255,.12)]" : "text-white/45 hover:text-white/80"}`}><Icon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{label}</span></button>)}
+          </nav>
+          {adminTab === "operação" && <section className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
             <div>
               <h2 className="font-display text-xl font-bold">
                 Contribuições e lista
@@ -422,8 +479,8 @@ export default function Admin() {
                 </div>
               ))}
             </div>
-          </section>
-          <section className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
+          </section>}
+          {adminTab === "operação" && <section className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
             <div>
               <h2 className="font-display text-xl font-bold">
                 Aguardando resposta
@@ -496,8 +553,8 @@ export default function Admin() {
                 ))}
               </div>
             )}
-          </section>
-          <section className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
+          </section>}
+          {adminTab === "convites" && <section className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
             <div>
               <h2 className="font-display text-xl font-bold">
                 Convite individual
@@ -591,8 +648,8 @@ export default function Admin() {
             <p className="text-xs leading-5 text-white/40">
               “Novo link” invalida o anterior, para manter o convite privado.
             </p>
-          </section>
-          <section className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
+          </section>}
+          {adminTab === "conteúdo" && <section className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
             <div>
               <h2 className="font-display text-xl font-bold">
                 Limpeza de conteúdo
@@ -654,7 +711,25 @@ export default function Admin() {
                 ))}
               </div>
             )}
-          </section>
+          </section>}
+          {adminTab === "avisos" && <>
+          <form onSubmit={publishAnnouncement} className="glass-card space-y-4 rounded-3xl p-5 sm:p-7">
+            <div>
+              <div className="flex items-center gap-2"><Vote className="h-4 w-4 text-primary" /><h2 className="font-display text-xl font-bold">Comunicado importante</h2></div>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">Abre em destaque no app, continua disponível na próxima abertura e envia push para quem ativou avisos.</p>
+            </div>
+            <label className="block text-sm font-medium">Título<input value={announcementTitle} onChange={(e) => setAnnouncementTitle(e.target.value)} required maxLength={80} placeholder="Ex.: Mudança no ponto de encontro" className="mt-2 h-11 w-full rounded-xl border border-white/15 bg-black/30 px-3 text-foreground" /></label>
+            <label className="block text-sm font-medium">Mensagem<textarea value={announcementBody} onChange={(e) => setAnnouncementBody(e.target.value)} required maxLength={240} placeholder="Escreva o recado importante aqui" className="mt-2 min-h-24 w-full rounded-xl border border-white/15 bg-black/30 p-3 text-foreground" /></label>
+            <div className="rounded-2xl border border-white/10 bg-black/15 p-3">
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium">Enquete opcional</p><button type="button" onClick={() => setPollOptions(["", ""])} className="text-xs text-primary hover:text-[#ffe39a]">Limpar</button></div>
+              <p className="mt-1 text-xs text-white/45">Deixe vazia para enviar só o aviso. Com duas ou mais opções, vira enquete.</p>
+              <div className="mt-3 space-y-2">{pollOptions.map((option, index) => <div key={index} className="flex gap-2"><input value={option} onChange={(e) => setPollOptions((items) => items.map((item, itemIndex) => itemIndex === index ? e.target.value : item))} maxLength={50} placeholder={`Opção ${index + 1}`} className="h-10 min-w-0 flex-1 rounded-xl border border-white/15 bg-black/30 px-3 text-sm" />{pollOptions.length > 2 && <button type="button" onClick={() => setPollOptions((items) => items.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remover opção" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-white/55 hover:text-red-200"><X className="h-4 w-4" /></button>}</div>)}</div>
+              {pollOptions.length < 4 && <button type="button" onClick={() => setPollOptions((items) => [...items, ""])} className="mt-3 text-xs font-semibold text-primary hover:text-[#ffe39a]">+ adicionar opção</button>}
+            </div>
+            <button className="premium-cta shimmer flex h-12 w-full items-center justify-center rounded-xl border border-[#fff0b4]/60 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] font-bold text-[#150d05]"><BellRing className="mr-2 h-4 w-4" />Publicar comunicado</button>
+            {announcementStatus && <p className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm text-primary">{announcementStatus}</p>}
+          </form>
+          {announcements.length > 0 && <section className="glass-card space-y-3 rounded-3xl p-5 sm:p-7"><div><h2 className="font-display text-xl font-bold">Comunicados enviados</h2><p className="mt-1 text-sm text-muted-foreground">Encerre um aviso quando ele não precisar mais aparecer.</p></div>{announcements.map((announcement) => <div key={announcement.id} className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="flex gap-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{announcement.title}</p><p className="mt-1 line-clamp-2 text-xs leading-5 text-white/50">{announcement.body}</p><p className="mt-2 text-[11px] text-white/40">{announcement.pollOptions.length ? `Enquete · ${announcement.totalVotes} voto(s)` : "Aviso"} · {announcement.active ? "ativo" : "encerrado"}</p></div>{announcement.active && <button type="button" onClick={() => void closeAnnouncement(announcement.id)} disabled={closingAnnouncementId === announcement.id} className="h-9 shrink-0 rounded-lg border border-red-300/25 px-3 text-xs font-semibold text-red-200 hover:bg-red-500/15 disabled:opacity-50">{closingAnnouncementId === announcement.id ? "Encerrando…" : "Encerrar"}</button>}</div></div>)}</section>}
           <form
             onSubmit={send}
             className="glass-card space-y-5 rounded-3xl p-5 sm:p-7"
@@ -717,6 +792,7 @@ export default function Admin() {
               </p>
             )}
           </form>
+          </>}
         </>
       )}
     </div>
