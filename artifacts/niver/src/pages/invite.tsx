@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { ArrowRight, LockKeyhole, ShipWheel } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, ShipWheel } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 
 type InvitePreview = { id: number; name: string; avatarUrl?: string | null };
@@ -12,6 +12,7 @@ export default function Invite() {
   const [invite, setInvite] = useState<InvitePreview | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -132,27 +133,11 @@ export default function Invite() {
             <form onSubmit={claim} className="mt-6 space-y-3 text-left">
               <label className="block text-sm font-medium">
                 Crie sua senha
-                <input
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={4}
-                  required
-                  className="mt-2 h-12 w-full rounded-xl border border-white/15 bg-black/30 px-3 text-foreground"
-                />
+                <span className="relative mt-2 block"><input value={password} onChange={(event) => setPassword(event.target.value)} type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={4} required className="h-12 w-full rounded-xl border border-white/15 bg-black/30 px-3 pr-12 text-foreground" /><button type="button" aria-label={showPassword ? 'Ocultar senhas' : 'Mostrar senhas'} title={showPassword ? 'Ocultar senhas' : 'Mostrar senhas'} onClick={() => setShowPassword((shown) => !shown)} className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-white/45 transition hover:bg-white/5 hover:text-primary">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span>
               </label>
               <label className="block text-sm font-medium">
                 Confirme a senha
-                <input
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={4}
-                  required
-                  className="mt-2 h-12 w-full rounded-xl border border-white/15 bg-black/30 px-3 text-foreground"
-                />
+                <span className="relative mt-2 block"><input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={4} required className="h-12 w-full rounded-xl border border-white/15 bg-black/30 px-3 pr-12 text-foreground" /><button type="button" aria-label={showPassword ? 'Ocultar senhas' : 'Mostrar senhas'} title={showPassword ? 'Ocultar senhas' : 'Mostrar senhas'} onClick={() => setShowPassword((shown) => !shown)} className="absolute right-1 top-1/2 grid h-10 w-10 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-white/45 transition hover:bg-white/5 hover:text-primary">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span>
               </label>
               <button
                 type="submit"

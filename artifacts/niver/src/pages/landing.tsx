@@ -4,7 +4,7 @@ import { useSession } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, Sparkles, X } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Sparkles, X } from "lucide-react";
 import { avatarAccents, avatarOptions, makeAvatar } from '@/lib/avatar-options';
 
 export default function Landing() {
@@ -12,6 +12,7 @@ export default function Landing() {
   const [, setLocation] = useLocation();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [entryError, setEntryError] = useState<string | null>(null);
 
@@ -77,15 +78,7 @@ export default function Landing() {
               className="premium-input h-14 border-white/15 bg-black/35 text-center text-lg placeholder:text-white/35 focus-visible:border-[#ffd782]/60 focus-visible:ring-[#ffd782]/30"
               disabled={isSubmitting}
             />
-            <Input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Crie ou digite sua senha"
-              type="password"
-              autoComplete="current-password"
-              className="premium-input h-14 border-white/15 bg-black/35 text-center text-lg placeholder:text-white/35 focus-visible:border-[#ffd782]/60 focus-visible:ring-[#ffd782]/30"
-              disabled={isSubmitting}
-            />
+            <div className="relative w-full"><Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Crie ou digite sua senha" type={showPassword ? 'text' : 'password'} autoComplete="current-password" className="premium-input h-14 border-white/15 bg-black/35 py-0 pl-4 pr-12 text-center text-lg placeholder:text-white/35 focus-visible:border-[#ffd782]/60 focus-visible:ring-[#ffd782]/30" disabled={isSubmitting} /><button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} title={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword((shown) => !shown)} className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-white/45 transition hover:bg-white/5 hover:text-[#ffe39a]">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
             <Button 
               type="submit" 
               size="lg" 
