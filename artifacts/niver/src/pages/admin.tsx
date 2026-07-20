@@ -218,7 +218,7 @@ export default function Admin() {
       if (!response.ok)
         throw new Error(data.error ?? "Não foi possível apagar.");
       setLedger((items) => items.filter((item) => item.id !== guest.id));
-      setInvites((items) => items.filter((item) => item.id !== guest.id));
+      setInvites((items) => items.filter((item) => item.guestId !== guest.id));
       setStatus(`${guest.name} foi removido(a) junto com seus conteúdos.`);
     } catch (error) {
       setStatus(
@@ -258,8 +258,14 @@ export default function Admin() {
   };
   const canUseAdmin = adminUnlocked;
   const waitingInvites = invites.filter((invite) => !invite.claimedAt);
+  const waitingInviteGuestIds = new Set(
+    waitingInvites.map((invite) => invite.guestId),
+  );
   const waitingAccounts = ledger.filter(
-    (guest) => guest.rsvp_status === "pending" && !guest.isAdmin,
+    (guest) =>
+      guest.rsvp_status === "pending" &&
+      !guest.isAdmin &&
+      !waitingInviteGuestIds.has(guest.id),
   );
   return (
     <div className="panel-enter mx-auto max-w-xl space-y-6 pb-24">

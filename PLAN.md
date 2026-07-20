@@ -117,26 +117,26 @@ Fase 6 concluída. Convite novo recebeu avatar persistido; convite legado sem av
 
 ### Fase 7: Operação de convites e aguardando resposta
 
-- [~] **T7.1** — Encurtar o trecho secreto dos links para um token seguro e legível ao lado do nome, sem reduzir a segurança a quatro dígitos previsíveis.
+- [x] **T7.1** — Encurtar o trecho secreto dos links para um token seguro e legível ao lado do nome, sem reduzir a segurança a quatro dígitos previsíveis.
   - Verificação: convite novo usa URL com slug legível + código curto aleatório; convite inválido continua bloqueado.
   - Estimativa: 15 min
   - Depende de: nenhuma
 
-- [ ] **T7.2** — Ajustar a cópia para que “Copiado” apareça somente após ação explícita e permitir gerar um novo link para convites antigos.
+- [x] **T7.2** — Ajustar a cópia para que “Copiado” apareça somente após ação explícita e permitir gerar um novo link para convites antigos.
   - Verificação: gerar convite não muda o botão para “Copiado”; cada convite listado oferece novo link e o novo URL é copiável.
   - Estimativa: 20 min
   - Depende de: T7.1
 
-- [ ] **T7.3** — Exibir no painel a lista privada de aguardando resposta, incluindo convites ainda não abertos e contas criadas sem RSVP, com remoção segura.
+- [x] **T7.3** — Exibir no painel a lista privada de aguardando resposta, incluindo convites ainda não abertos e contas criadas sem RSVP, com remoção segura.
   - Verificação: a lista não aparece publicamente; os dois tipos ficam visíveis e o botão de apagar protege a conta do capitão.
   - Estimativa: 25 min
   - Depende de: T7.2
 
-- [ ] **T7.4** — QA de API, desktop e mobile, com limpeza de dados temporários.
+- [x] **T7.4** — QA de API, desktop e mobile, com limpeza de dados temporários.
   - Verificação: build/typecheck passam; fluxos de URL/cópia/aguardando passam em produção; aliases usam o mesmo bundle.
   - Estimativa: 20 min
   - Depende de: T7.1, T7.2, T7.3
 
 ## Estado atual
 
-Fase 7 em execução: tornar os convites mais práticos sem transformar o link em uma credencial adivinhável.
+Fase 7 concluída. Convites novos usam nome + 8 caracteres aleatórios (48 bits); “Copiado” só aparece depois do toque; convites antigos têm “Novo link”; e a lista privada separa convites ainda não abertos de contas pendentes comuns, sem duplicar. QA de API confirmou rotação (URL antiga 404, nova válida), avatar, limpeza dos testes e bundle idêntico nos dois aliases; QA visual mobile confirmou o fluxo de geração e cópia.

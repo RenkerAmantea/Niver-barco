@@ -575,12 +575,10 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "GET" && path === "/push/config") {
-      return res
-        .status(200)
-        .json({
-          supported: Boolean(VAPID_PUBLIC_KEY),
-          publicKey: VAPID_PUBLIC_KEY ?? null,
-        });
+      return res.status(200).json({
+        supported: Boolean(VAPID_PUBLIC_KEY),
+        publicKey: VAPID_PUBLIC_KEY ?? null,
+      });
     }
 
     if (req.method === "GET" && path === "/push/health") {
@@ -656,12 +654,10 @@ export default async function handler(req, res) {
             : [];
         })
         .slice(0, 40);
-      return res
-        .status(200)
-        .json({
-          notifications,
-          unreadCount: notifications.filter((item) => !item.readAt).length,
-        });
+      return res.status(200).json({
+        notifications,
+        unreadCount: notifications.filter((item) => !item.readAt).length,
+      });
     }
 
     const notificationReadMatch = path.match(/^\/notifications\/(\d+)\/read$/);
@@ -839,18 +835,17 @@ export default async function handler(req, res) {
           });
           return res.status(markerResponse.status).json(markers);
         }
-        const origin = req.headers.origin || "https://niver-barco.vercel.app";
-        return res
-          .status(201)
-          .json({
-            id: markers?.[0]?.id,
-            guestId: guest.id,
-            name: guest.name,
-            slug: invite.slug,
-            url: `${origin}/i/${token}`,
-            createdAt: invite.createdAt,
-            claimedAt: null,
-          });
+        const origin =
+          req.headers.origin || "https://renker-niver-barco.vercel.app";
+        return res.status(201).json({
+          id: markers?.[0]?.id,
+          guestId: guest.id,
+          name: guest.name,
+          slug: invite.slug,
+          url: `${origin}/i/${token}`,
+          createdAt: invite.createdAt,
+          claimedAt: null,
+        });
       }
       return res.status(405).end();
     }
@@ -899,17 +894,15 @@ export default async function handler(req, res) {
           .json(await readJson(updateResponse));
       const origin =
         req.headers.origin || "https://renker-niver-barco.vercel.app";
-      return res
-        .status(200)
-        .json({
-          id: marker.id,
-          guestId: guest.id,
-          name: guest.name,
-          slug: invite.slug,
-          url: `${origin}/i/${token}`,
-          createdAt: invite.createdAt,
-          claimedAt: invite.claimedAt,
-        });
+      return res.status(200).json({
+        id: marker.id,
+        guestId: guest.id,
+        name: guest.name,
+        slug: invite.slug,
+        url: `${origin}/i/${token}`,
+        createdAt: invite.createdAt,
+        claimedAt: invite.claimedAt,
+      });
     }
 
     const inviteMatch = path.match(/^\/invites\/([^/]+)$/);
@@ -970,14 +963,12 @@ export default async function handler(req, res) {
         `niver_barco_posts?select=content&guest_id=eq.${marker.guest_id}`,
       );
       const guestMarkers = await readJson(adminMarkerResponse);
-      return res
-        .status(200)
-        .json({
-          ...guestResponse(invitedGuest),
-          isAdmin: (guestMarkers ?? []).some((item) =>
-            adminMarkerFromContent(item.content),
-          ),
-        });
+      return res.status(200).json({
+        ...guestResponse(invitedGuest),
+        isAdmin: (guestMarkers ?? []).some((item) =>
+          adminMarkerFromContent(item.content),
+        ),
+      });
     }
 
     if (path === "/admin/payments") {
@@ -1010,20 +1001,17 @@ export default async function handler(req, res) {
       const settingsMarker = [...(markers ?? [])]
         .reverse()
         .find((marker) => paymentSettingsFromContent(marker.content));
-      return res
-        .status(200)
-        .json({
-          guests: (guests ?? [])
-            .filter((guest) => !hidden.has(guest.id))
-            .map((guest) => ({
-              ...guest,
-              payment: payments.get(guest.id)?.status ?? "pending",
-              isAdmin: isCaptainGuest(guest.id, markers ?? []),
-            })),
-          reminderEnabled:
-            paymentSettingsFromContent(settingsMarker?.content)?.enabled ??
-            false,
-        });
+      return res.status(200).json({
+        guests: (guests ?? [])
+          .filter((guest) => !hidden.has(guest.id))
+          .map((guest) => ({
+            ...guest,
+            payment: payments.get(guest.id)?.status ?? "pending",
+            isAdmin: isCaptainGuest(guest.id, markers ?? []),
+          })),
+        reminderEnabled:
+          paymentSettingsFromContent(settingsMarker?.content)?.enabled ?? false,
+      });
     }
 
     const adminGuestMatch = path.match(/^\/admin\/guests\/(\d+)$/);
@@ -1051,11 +1039,9 @@ export default async function handler(req, res) {
       if (!markerResponse.ok)
         return res.status(markerResponse.status).json(markers);
       if (isCaptainGuest(guestId, markers ?? []))
-        return res
-          .status(403)
-          .json({
-            error: "A conta do capitão não pode ser apagada pelo painel.",
-          });
+        return res.status(403).json({
+          error: "A conta do capitão não pode ser apagada pelo painel.",
+        });
       const deleteResponse = await rest(`niver_barco_guests?id=eq.${guestId}`, {
         method: "DELETE",
         headers: { Prefer: "return=minimal" },
@@ -1439,12 +1425,10 @@ export default async function handler(req, res) {
           .map((marker) => passwordFromContent(marker.content))
           .find(Boolean);
         if (!record)
-          return res
-            .status(409)
-            .json({
-              error:
-                "Este perfil foi criado antes do acesso com senha. Entre pelo atalho “Entrar como” deste aparelho para não perder o perfil.",
-            });
+          return res.status(409).json({
+            error:
+              "Este perfil foi criado antes do acesso com senha. Entre pelo atalho “Entrar como” deste aparelho para não perder o perfil.",
+          });
         if (!passwordMatches(password, record))
           return res.status(401).json({ error: "Nome ou senha não conferem." });
         return res.status(200).json(guestResponse(guest));
@@ -1479,12 +1463,10 @@ export default async function handler(req, res) {
         await rest(`niver_barco_guests?id=eq.${createdGuest.id}`, {
           method: "DELETE",
         });
-        return res
-          .status(500)
-          .json({
-            error:
-              "Não foi possível preparar o acesso deste perfil. Tente de novo.",
-          });
+        return res.status(500).json({
+          error:
+            "Não foi possível preparar o acesso deste perfil. Tente de novo.",
+        });
       }
       return res.status(201).json(guestResponse(createdGuest));
     }
@@ -1502,12 +1484,10 @@ export default async function handler(req, res) {
           (guest) => normalizedName(guest.name) === normalizedName(name),
         )
       )
-        return res
-          .status(409)
-          .json({
-            error:
-              "Esse nome já está em uso. Se você já entrou antes, use “Entrar como” para retomar seu perfil.",
-          });
+        return res.status(409).json({
+          error:
+            "Esse nome já está em uso. Se você já entrou antes, use “Entrar como” para retomar seu perfil.",
+        });
       const response = await rest("niver_barco_guests", {
         method: "POST",
         headers: { Prefer: "return=representation" },
@@ -1743,14 +1723,12 @@ export default async function handler(req, res) {
             reactionsByReply.set(reaction.replyId, bucket);
           }
         }
-        return res
-          .status(200)
-          .json(
-            replies.map((reply) => ({
-              ...replyResponse(reply, guests),
-              reactions: reactionsByReply.get(reply.id) ?? [],
-            })),
-          );
+        return res.status(200).json(
+          replies.map((reply) => ({
+            ...replyResponse(reply, guests),
+            reactions: reactionsByReply.get(reply.id) ?? [],
+          })),
+        );
       }
       if (req.method === "POST") {
         const guestId = Number(req.body?.guestId);
