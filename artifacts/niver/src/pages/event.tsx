@@ -43,6 +43,11 @@ const faq = [
     answer:
       "Chega, sim. Também há barraquinhas de comida por perto até mais ou menos 20h.",
   },
+  {
+    question: "Tô brigado com fulano(a), e agora?",
+    answer:
+      "O barco é grande: dá para ficar em outro canto, montar sua própria rodinha e preservar a paz marítima.",
+  },
   { question: "Posso levar criança?", answer: "Pode." },
   {
     question: "O barco vai navegar? Preciso chegar às 19h em ponto?",

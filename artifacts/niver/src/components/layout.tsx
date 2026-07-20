@@ -39,6 +39,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/fotos", label: "Fotos", icon: Images },
     { href: "/perfil", label: "Perfil", icon: UserRound },
   ];
+  // A sessão pode ter sido criada antes de a permissão administrativa ser
+  // gravada localmente. O servidor ainda exige a credencial real; isto só
+  // mantém o atalho disponível para a conta oficial do capitão.
+  const canOpenAdmin = Boolean(session?.isAdmin || session?.name.trim() === 'Renker Amantéa 🛸');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -53,7 +57,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           {session && (
-            <div className="flex items-center gap-1"><NotificationBell />{session.isAdmin && <Button variant="ghost" size="icon" onClick={() => setLocation('/admin')} title="Administração" className="h-10 w-8 cursor-pointer text-primary hover:bg-transparent"><Shield className="h-4 w-4" /></Button>}</div>
+            <div className="flex items-center gap-1"><NotificationBell />{canOpenAdmin && <Button variant="ghost" size="icon" onClick={() => setLocation('/admin')} aria-label="Abrir administração" title="Administração" className="h-10 w-10 cursor-pointer text-primary hover:bg-primary/10 hover:text-[#ffe8ac]"><Shield className="h-4 w-4" /></Button>}</div>
           )}
         </div>
       </header>}
