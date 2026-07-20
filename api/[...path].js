@@ -147,7 +147,7 @@ function replyReactionFromContent(content) {
   const match =
     typeof content === "string" &&
     content.match(
-      /^\[\[niver-reply-reaction:(\d+):(heart|fire|boat|party)\]\]$/,
+      /^\[\[niver-reply-reaction:(\d+):(heart|thumb|fire|boat)\]\]$/,
     );
   return match ? { replyId: Number(match[1]), emoji: match[2] } : null;
 }
@@ -1968,7 +1968,7 @@ export default async function handler(req, res) {
     const replyReactionsMatch = path.match(/^\/replies\/(\d+)\/reactions$/);
     if (replyReactionsMatch) {
       const replyId = Number(replyReactionsMatch[1]);
-      const allowed = new Set(["heart", "fire", "boat", "party"]);
+      const allowed = new Set(["heart", "thumb", "fire", "boat"]);
       if (req.method === "GET") {
         const response = await rest(
           "niver_barco_posts?select=guest_id,content",
@@ -2020,7 +2020,7 @@ export default async function handler(req, res) {
         const reactions = await readJson(response);
         if (!response.ok) return res.status(response.status).json(reactions);
         const summary = Object.fromEntries(
-          ["heart", "fire", "boat", "party"].map((emoji) => [
+          ["heart", "thumb", "fire", "boat"].map((emoji) => [
             emoji,
             { count: 0, reacted: false },
           ]),
@@ -2030,7 +2030,7 @@ export default async function handler(req, res) {
       }
       const guestId = Number(req.body?.guestId);
       const emoji = req.body?.emoji;
-      const allowed = new Set(["heart", "fire", "boat", "party"]);
+      const allowed = new Set(["heart", "thumb", "fire", "boat"]);
       if (!Number.isInteger(guestId) || !allowed.has(emoji))
         return res.status(400).json({ error: "Reação inválida" });
       if (req.method === "POST") {

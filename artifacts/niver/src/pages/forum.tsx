@@ -15,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Mic, Pause, Play, Square, Sparkles, X } from "lucide-react";
+import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Mic, Pause, Play, Square, ThumbsUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PostReplies } from "@/components/post-replies";
 
@@ -80,10 +80,10 @@ function AudioPlayer({ src, durationMs }: { src: string; durationMs?: number }) 
 }
 
 export const reactionOptions = [
-  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/30 text-pink-100', iconClass: 'fill-pink-400 text-pink-200' },
-  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'border-orange-300/55 bg-orange-500/30 text-orange-100', iconClass: 'fill-orange-400 text-orange-100' },
-  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'border-sky-300/55 bg-sky-500/30 text-sky-100', iconClass: 'text-sky-100' },
-  { key: 'party', label: 'Brilho', icon: Sparkles, activeClass: 'border-violet-300/55 bg-violet-500/20 text-violet-200', iconClass: 'text-violet-200' },
+  { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'fill-pink-400 text-pink-200' },
+  { key: 'thumb', label: 'Joinha', icon: ThumbsUp, activeClass: 'fill-sky-400 text-sky-200' },
+  { key: 'fire', label: 'Fogo', icon: Flame, activeClass: 'fill-orange-400 text-orange-100' },
+  { key: 'boat', label: 'Âncora', icon: Anchor, activeClass: 'text-sky-100' },
 ];
 
 function ReactionBar({ postId, compact = false }: { postId: number; compact?: boolean }) {
@@ -106,9 +106,10 @@ function ReactionBar({ postId, compact = false }: { postId: number; compact?: bo
     if (!active) { setBurst(emoji); window.setTimeout(() => setBurst(null), 420); }
     void load();
   };
-  return <div className={cn("flex items-center gap-1.5", !compact && "flex-wrap pt-3")}>{reactionOptions.map(({ key, label, icon: Icon, activeClass, iconClass }) => {
+  return <div className={cn("flex items-center gap-1", !compact && "flex-wrap pt-3")}>{reactionOptions.map(({ key, label, icon: Icon, activeClass }) => {
     const active = reactions[key]?.reacted;
-    return <button key={key} type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className={cn("reaction-chip reaction-icon-chip cursor-pointer", active && activeClass, burst === key && "reaction-burst")}><Icon className={cn("h-4 w-4", iconClass, active && key === 'party' && 'fill-current')} />{reactions[key]?.count > 0 && <span>{reactions[key].count}</span>}</button>;
+    const count = reactions[key]?.count ?? 0;
+    return <button key={key} type="button" onClick={() => void toggle(key)} aria-label={`Reagir com ${label}`} aria-pressed={active} className={cn("inline-flex h-8 min-w-7 cursor-pointer items-center justify-center gap-1 rounded-lg px-1.5 text-white/35 transition-all hover:bg-white/[.055] hover:text-white/75", count > 0 && activeClass, burst === key && "reaction-burst")}><Icon className="h-4 w-4" />{count > 0 && <span className="text-[11px] font-semibold">{count}</span>}</button>;
   })}</div>;
 }
 
