@@ -27,9 +27,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [session]);
 
   useEffect(() => {
-    if (!session || !isAppleMobileBrowser() || isStandaloneApp()) return;
+    if (!isAppleMobileBrowser() || isStandaloneApp()) return;
     if (!localStorage.getItem('niver_ios_install_seen')) setShowIosInstall(true);
-  }, [session]);
+  }, []);
 
   useEffect(() => { setAnnouncementsChecked(false); setAnnouncementPending(false); }, [session?.id]);
   const markAnnouncementsChecked = useCallback(() => setAnnouncementsChecked(true), []);
@@ -53,7 +53,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const dismissIosInstall = () => { localStorage.setItem('niver_ios_install_seen', '1'); setShowIosInstall(false); };
   const showPresence = Boolean(announcementsChecked && session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados');
   const showAnnouncement = announcementPending;
-  const showIosGuide = announcementsChecked && !showAnnouncement && !showPresence && showIosInstall;
+  const showIosGuide = (!session || announcementsChecked) && !showAnnouncement && !showPresence && showIosInstall;
   const showPushSettings = !showAnnouncement && !showPresence && !showIosGuide && showPushNudge;
 
   const navLinks = [
