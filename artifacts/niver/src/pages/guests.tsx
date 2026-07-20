@@ -104,16 +104,16 @@ export default function Guests() {
         
         <Tabs defaultValue="going" className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-8 h-14 p-1.5 bg-black/40 border-white/5">
-            <TabsTrigger value="going" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/30">
+            <TabsTrigger value="going" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:border data-[state=active]:border-emerald-300/65 data-[state=active]:bg-emerald-500/25 data-[state=active]:text-emerald-100 data-[state=active]:shadow-[0_0_20px_rgba(52,211,153,.25)]">
               Vou ✓ ({going.length})
             </TabsTrigger>
-            <TabsTrigger value="maybe" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-secondary data-[state=active]:text-white">
+            <TabsTrigger value="maybe" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:border data-[state=active]:border-amber-300/65 data-[state=active]:bg-amber-500/25 data-[state=active]:text-amber-100 data-[state=active]:shadow-[0_0_20px_rgba(251,191,36,.22)]">
               Talvez ? ({maybe.length})
             </TabsTrigger>
             <TabsTrigger value="not_going" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-destructive/20 data-[state=active]:text-destructive-foreground data-[state=active]:border data-[state=active]:border-destructive/30">
               Não vou ✗ ({notGoing.length})
             </TabsTrigger>
-            <TabsTrigger value="invited" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:bg-primary/15 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/25">
+            <TabsTrigger value="invited" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:border data-[state=active]:border-amber-300/45 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-100">
               Convidados ({invited.length})
             </TabsTrigger>
           </TabsList>

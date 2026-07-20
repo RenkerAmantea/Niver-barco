@@ -21,6 +21,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (standalone && !sessionStorage.getItem('niver_push_nudge_seen')) setShowPushNudge(true);
   }, [session]);
 
+  useEffect(() => {
+    const openSettings = () => setShowPushNudge(true);
+    window.addEventListener('niver:open-push-settings', openSettings);
+    return () => window.removeEventListener('niver:open-push-settings', openSettings);
+  }, []);
+
   const dismissPushNudge = () => {
     sessionStorage.setItem('niver_push_nudge_seen', '1');
     setShowPushNudge(false);
