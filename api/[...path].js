@@ -127,8 +127,8 @@ function parsePhotoPost(content) {
 }
 
 function parseAudioPost(content) {
-  const match = typeof content === "string" && content.match(/^\[\[niver-audio:([^\]]+)\]\]([\s\S]*)$/);
-  return match ? { url: match[1], caption: match[2].trim() } : null;
+  const match = typeof content === "string" && content.match(/^\[\[niver-audio:([^|\]]+)(?:\|(\d+))?\]\]([\s\S]*)$/);
+  return match ? { url: match[1], durationMs: Number(match[2]) || null, caption: match[3].trim() } : null;
 }
 
 async function readJson(response) {

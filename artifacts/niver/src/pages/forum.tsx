@@ -15,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Mic, Square, Sparkles, X } from "lucide-react";
+import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Mic, Pause, Play, Square, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PostReplies } from "@/components/post-replies";
 
@@ -29,7 +29,35 @@ function splitPhotoPost(content: string) {
   const [url, source = 'mural'] = content.slice(photoMarker.length, end).split('|');
   return { url, source, caption: content.slice(end + 2).trim() };
 }
-function splitAudioPost(content: string) { if (!content.startsWith(audioMarker)) return null; const end = content.indexOf(']]'); return end < 0 ? null : { url: content.slice(audioMarker.length, end), caption: content.slice(end + 2).trim() }; }
+function splitAudioPost(content: string) { if (!content.startsWith(audioMarker)) return null; const end = content.indexOf(']]'); if (end < 0) return null; const [url, rawDuration] = content.slice(audioMarker.length, end).split('|'); return { url, durationMs: Number(rawDuration) || undefined, caption: content.slice(end + 2).trim() }; }
+
+function formatAudioTime(milliseconds = 0) {
+  const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function AudioPlayer({ src, durationMs }: { src: string; durationMs?: number }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const fallbackDuration = durationMs ?? 0;
+  const total = Math.max(fallbackDuration, elapsed, 1);
+  const progress = Math.min(100, (elapsed / total) * 100);
+  const bars = [34, 58, 76, 48, 92, 64, 42, 70, 88, 52, 36, 68, 82, 50, 72, 40, 60, 86, 54, 38, 66, 78, 46, 70];
+  const toggle = async () => {
+    const audio = audioRef.current; if (!audio) return;
+    if (playing) { audio.pause(); return; }
+    if (durationMs && audio.currentTime * 1000 >= durationMs) audio.currentTime = 0;
+    await audio.play();
+  };
+  return <div className="rounded-2xl border border-[#f9d98a]/20 bg-[#0d1024]/70 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.06)]">
+    <audio ref={audioRef} src={src} preload="metadata" onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); setElapsed(0); }} onTimeUpdate={(event) => { const next = event.currentTarget.currentTime * 1000; setElapsed(next); if (durationMs && next >= durationMs) { event.currentTarget.pause(); event.currentTarget.currentTime = 0; setElapsed(0); } }} />
+    <div className="flex items-center gap-3">
+      <button type="button" onClick={() => void toggle()} aria-label={playing ? 'Pausar áudio' : 'Reproduzir áudio'} className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#ffe5a0]/55 bg-gradient-to-br from-[#ffe399] to-[#c87520] text-[#160e05] shadow-[0_0_18px_rgba(248,204,109,.18)] transition hover:brightness-110">{playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}</button>
+      <div className="min-w-0 flex-1"><div className="flex h-8 items-center gap-[3px]" aria-hidden="true">{bars.map((height, index) => <span key={index} className="w-1 flex-1 rounded-full bg-[#f9d98a] transition-opacity" style={{ height: `${height}%`, opacity: index / bars.length * 100 < progress ? 1 : .28 }} />)}</div><div className="mt-1 flex justify-between text-[10px] font-medium tracking-wide text-white/45"><span>{formatAudioTime(elapsed)}</span><span>{durationMs ? formatAudioTime(durationMs) : 'áudio'}</span></div></div>
+    </div>
+  </div>;
+}
 
 export const reactionOptions = [
   { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/30 text-pink-100', iconClass: 'fill-pink-400 text-pink-200' },
@@ -75,8 +103,10 @@ export default function Forum() {
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
+  const [audioDurationMs, setAudioDurationMs] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStartedAtRef = useRef<number>(0);
 
   const { data: posts, isLoading: isLoadingPosts } = useListPosts();
   const { data: guests } = useListGuests();
@@ -105,12 +135,12 @@ export default function Forum() {
     }
 
     createPost.mutate(
-      { data: { guestId: session.id, content: photoUrl ? `${photoMarker}${photoUrl}|mural]]${content.trim()}` : audioUrl ? `${audioMarker}${audioUrl}]]${content.trim()}` : content.trim() } },
+      { data: { guestId: session.id, content: photoUrl ? `${photoMarker}${photoUrl}|mural]]${content.trim()}` : audioUrl ? `${audioMarker}${audioUrl}|${audioDurationMs ?? 0}]]${content.trim()}` : content.trim() } },
       {
         onSuccess: (newPost) => {
           setContent("");
           setPhotoUrl(null);
-          if (audioPreview) URL.revokeObjectURL(audioPreview); setAudioBlob(null); setAudioPreview(null);
+          if (audioPreview) URL.revokeObjectURL(audioPreview); setAudioBlob(null); setAudioPreview(null); setAudioDurationMs(null);
           queryClient.setQueryData(getListPostsQueryKey(), (old: Post[] | undefined) => {
             return old ? [newPost, ...old] : [newPost];
           });
@@ -121,7 +151,7 @@ export default function Forum() {
 
   const toggleRecording = async () => {
     if (recording && recorderRef.current) { recorderRef.current.stop(); return; }
-    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const recorder = new MediaRecorder(stream); const chunks: BlobPart[] = []; recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); }; recorder.onstop = () => { stream.getTracks().forEach(track => track.stop()); const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }); if (blob.size > 8 * 1024 * 1024) { setPhotoError('O áudio ficou maior que 8 MB. Grave algo mais curto.'); } else { setAudioBlob(blob); setAudioPreview(URL.createObjectURL(blob)); } setRecording(false); }; recorder.start(); recorderRef.current = recorder; setRecording(true); } catch { setPhotoError('Não foi possível acessar o microfone. Libere a permissão e tente de novo.'); }
+    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const recorder = new MediaRecorder(stream); const chunks: BlobPart[] = []; recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); }; recorder.onstop = () => { stream.getTracks().forEach(track => track.stop()); const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }); const duration = Math.max(500, Date.now() - recordingStartedAtRef.current); if (blob.size > 8 * 1024 * 1024) { setPhotoError('O áudio ficou maior que 8 MB. Grave algo mais curto.'); } else { setAudioBlob(blob); setAudioDurationMs(duration); setAudioPreview(URL.createObjectURL(blob)); } setRecording(false); }; recordingStartedAtRef.current = Date.now(); recorder.start(); recorderRef.current = recorder; setRecording(true); setPhotoError(null); } catch { setPhotoError('Não foi possível acessar o microfone. Libere a permissão e tente de novo.'); }
   };
 
   const handlePhotoSelect = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -177,11 +207,12 @@ export default function Forum() {
               {mentionChoices.length > 0 && <div className="relative z-20 -mt-2 w-full max-w-xs overflow-hidden rounded-xl border border-white/12 bg-[#101126] shadow-2xl">{mentionChoices.map((guest) => <button key={guest.id} type="button" onClick={() => selectMention(guest.name)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-white/5"><span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-xs text-primary">{guest.name[0]}</span>{guest.name}</button>)}</div>}
               <input ref={photoInputRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={handlePhotoSelect} />
               {photoUrl && <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30"><img src={photoUrl} alt="Prévia da foto a publicar" className="max-h-64 w-full object-cover" /><button type="button" onClick={() => setPhotoUrl(null)} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/65 text-white hover:bg-black"><X className="h-4 w-4" /></button></div>}
-              {audioPreview && <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-3"><audio controls src={audioPreview} className="min-w-0 flex-1" /><button type="button" onClick={() => { URL.revokeObjectURL(audioPreview); setAudioBlob(null); setAudioPreview(null); }} className="text-white/65 hover:text-white"><X className="h-4 w-4" /></button></div>}
+              {recording && <div className="flex items-center gap-3 rounded-2xl border border-red-300/25 bg-red-500/[.08] p-3"><span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-red-500/20 text-red-200"><span className="absolute inset-0 animate-ping rounded-full bg-red-400/25" /><Mic className="relative h-4 w-4" /></span><div className="flex h-7 flex-1 items-center gap-1" aria-label="Gravando áudio">{[32,55,76,46,92,62,38,70,84,48,66,36,78,52,90,42].map((height, index) => <span key={index} className="w-1 flex-1 animate-pulse rounded-full bg-red-300/85" style={{ height: `${height}%`, animationDelay: `${index * 65}ms` }} />)}</div><span className="text-xs font-semibold text-red-100">Gravando</span></div>}
+              {audioPreview && <div className="relative"><AudioPlayer src={audioPreview} durationMs={audioDurationMs ?? undefined} /><button type="button" aria-label="Remover áudio" onClick={() => { URL.revokeObjectURL(audioPreview); setAudioBlob(null); setAudioPreview(null); setAudioDurationMs(null); }} className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full border border-white/15 bg-[#101126] text-white/65 shadow-lg transition hover:text-white"><X className="h-3.5 w-3.5" /></button></div>}
               {photoError && <p className="text-sm text-red-200">{photoError}</p>}
-              <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-1">
                 <Button type="button" variant="ghost" onClick={() => photoInputRef.current?.click()} disabled={isUploadingPhoto || recording} className="text-muted-foreground hover:bg-white/5 hover:text-primary">{isUploadingPhoto ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} Foto</Button>
-                <Button type="button" variant="ghost" onClick={() => void toggleRecording()} disabled={isUploadingPhoto} className={recording ? 'text-red-200 hover:bg-red-500/10' : 'text-muted-foreground hover:bg-white/5 hover:text-primary'}>{recording ? <Square className="mr-2 h-4 w-4 fill-current" /> : <Mic className="mr-2 h-4 w-4" />}{recording ? 'Parar' : 'Áudio'}</Button></div>
+                <Button type="button" variant="ghost" size="icon" title={recording ? 'Parar gravação' : 'Gravar áudio'} aria-label={recording ? 'Parar gravação' : 'Gravar áudio'} onClick={() => void toggleRecording()} disabled={isUploadingPhoto} className={cn('h-10 w-10 shrink-0', recording ? 'text-red-200 hover:bg-red-500/10' : 'text-muted-foreground hover:bg-white/5 hover:text-primary')} >{recording ? <Square className="h-4 w-4 fill-current" /> : <Mic className="h-4 w-4" />}</Button></div>
                 <Button 
                   type="submit" 
                   disabled={(!content.trim() && !photoUrl && !audioBlob) || createPost.isPending || isUploadingPhoto || recording}
@@ -238,7 +269,7 @@ export default function Forum() {
                         {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ptBR })}
                       </span>
                     </div>
-                    {(() => { const photo = splitPhotoPost(post.content); const audio = splitAudioPost(post.content); return photo ? <div className="space-y-3"><img src={photo.url} alt={`Foto publicada por ${post.guestName}`} className="max-h-[32rem] w-full rounded-2xl border border-white/10 object-cover" />{photo.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{photo.caption}</p>}</div> : audio ? <div className="space-y-3 rounded-2xl border border-primary/15 bg-primary/[.06] p-3"><audio controls src={audio.url} className="w-full" />{audio.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{audio.caption}</p>}</div> : <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{post.content}</p>; })()}
+                    {(() => { const photo = splitPhotoPost(post.content); const audio = splitAudioPost(post.content); return photo ? <div className="space-y-3"><img src={photo.url} alt={`Foto publicada por ${post.guestName}`} className="max-h-[32rem] w-full rounded-2xl border border-white/10 object-cover" />{photo.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{photo.caption}</p>}</div> : audio ? <div className="space-y-3"><AudioPlayer src={audio.url} durationMs={audio.durationMs} />{audio.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{audio.caption}</p>}</div> : <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{post.content}</p>; })()}
                     
                     <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/5 pt-3">
                       <Button 
