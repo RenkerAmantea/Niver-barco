@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import {
   Check,
+  ArrowLeft,
   Copy,
   Link2,
   Send,
@@ -41,6 +43,7 @@ const paymentLabel = {
 
 export default function Admin() {
   const { session } = useSession();
+  const [, setLocation] = useLocation();
   const [password, setPassword] = useState(
     () => sessionStorage.getItem("niver_admin_password") ?? "",
   );
@@ -280,6 +283,7 @@ export default function Admin() {
   return (
     <div className="panel-enter mx-auto max-w-xl space-y-6 pb-24">
       <section>
+        <button type="button" onClick={() => setLocation('/evento')} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-[#ffe5a2]"><ArrowLeft className="h-4 w-4" />Voltar para o app</button>
         <p className="text-xs font-semibold uppercase tracking-[.2em] text-primary">
           Cabine do capitão
         </p>

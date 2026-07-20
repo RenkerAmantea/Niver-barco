@@ -15,11 +15,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Sparkles, X } from "lucide-react";
+import { Anchor, Flame, Heart, ImagePlus, LoaderCircle, MessageSquare, Mic, Square, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PostReplies } from "@/components/post-replies";
 
 const photoMarker = '[[niver-photo:';
+const audioMarker = '[[niver-audio:';
 
 function splitPhotoPost(content: string) {
   if (!content.startsWith(photoMarker)) return null;
@@ -28,6 +29,7 @@ function splitPhotoPost(content: string) {
   const [url, source = 'mural'] = content.slice(photoMarker.length, end).split('|');
   return { url, source, caption: content.slice(end + 2).trim() };
 }
+function splitAudioPost(content: string) { if (!content.startsWith(audioMarker)) return null; const end = content.indexOf(']]'); return end < 0 ? null : { url: content.slice(audioMarker.length, end), caption: content.slice(end + 2).trim() }; }
 
 export const reactionOptions = [
   { key: 'heart', label: 'Coração', icon: Heart, activeClass: 'border-pink-300/55 bg-pink-500/30 text-pink-100', iconClass: 'fill-pink-400 text-pink-200' },
@@ -71,6 +73,10 @@ export default function Forum() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [expandedPostId, setExpandedPostId] = useState<number | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioPreview, setAudioPreview] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
 
   const { data: posts, isLoading: isLoadingPosts } = useListPosts();
   const { data: guests } = useListGuests();
@@ -88,22 +94,34 @@ export default function Forum() {
 
   if (!session) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!content.trim() && !photoUrl) || !session?.id) return;
+    if ((!content.trim() && !photoUrl && !audioBlob) || !session?.id) return;
+    let audioUrl: string | null = null;
+    if (audioBlob) {
+      const signedResponse = await fetch('/api/photos/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, contentType: audioBlob.type || 'audio/webm', purpose: 'audio' }) });
+      const signed = await signedResponse.json(); if (!signedResponse.ok) { setPhotoError(signed.error ?? 'Não foi possível preparar o áudio.'); return; }
+      const upload = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': audioBlob.type || 'audio/webm', 'x-upsert': 'false' }, body: audioBlob }); if (!upload.ok) { setPhotoError('O envio do áudio falhou.'); return; } audioUrl = signed.publicUrl;
+    }
 
     createPost.mutate(
-      { data: { guestId: session.id, content: photoUrl ? `${photoMarker}${photoUrl}|mural]]${content.trim()}` : content.trim() } },
+      { data: { guestId: session.id, content: photoUrl ? `${photoMarker}${photoUrl}|mural]]${content.trim()}` : audioUrl ? `${audioMarker}${audioUrl}]]${content.trim()}` : content.trim() } },
       {
         onSuccess: (newPost) => {
           setContent("");
           setPhotoUrl(null);
+          if (audioPreview) URL.revokeObjectURL(audioPreview); setAudioBlob(null); setAudioPreview(null);
           queryClient.setQueryData(getListPostsQueryKey(), (old: Post[] | undefined) => {
             return old ? [newPost, ...old] : [newPost];
           });
         }
       }
     );
+  };
+
+  const toggleRecording = async () => {
+    if (recording && recorderRef.current) { recorderRef.current.stop(); return; }
+    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const recorder = new MediaRecorder(stream); const chunks: BlobPart[] = []; recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); }; recorder.onstop = () => { stream.getTracks().forEach(track => track.stop()); const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }); if (blob.size > 8 * 1024 * 1024) { setPhotoError('O áudio ficou maior que 8 MB. Grave algo mais curto.'); } else { setAudioBlob(blob); setAudioPreview(URL.createObjectURL(blob)); } setRecording(false); }; recorder.start(); recorderRef.current = recorder; setRecording(true); } catch { setPhotoError('Não foi possível acessar o microfone. Libere a permissão e tente de novo.'); }
   };
 
   const handlePhotoSelect = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -159,12 +177,14 @@ export default function Forum() {
               {mentionChoices.length > 0 && <div className="relative z-20 -mt-2 w-full max-w-xs overflow-hidden rounded-xl border border-white/12 bg-[#101126] shadow-2xl">{mentionChoices.map((guest) => <button key={guest.id} type="button" onClick={() => selectMention(guest.name)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-white/5"><span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-xs text-primary">{guest.name[0]}</span>{guest.name}</button>)}</div>}
               <input ref={photoInputRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={handlePhotoSelect} />
               {photoUrl && <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30"><img src={photoUrl} alt="Prévia da foto a publicar" className="max-h-64 w-full object-cover" /><button type="button" onClick={() => setPhotoUrl(null)} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/65 text-white hover:bg-black"><X className="h-4 w-4" /></button></div>}
+              {audioPreview && <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-3"><audio controls src={audioPreview} className="min-w-0 flex-1" /><button type="button" onClick={() => { URL.revokeObjectURL(audioPreview); setAudioBlob(null); setAudioPreview(null); }} className="text-white/65 hover:text-white"><X className="h-4 w-4" /></button></div>}
               {photoError && <p className="text-sm text-red-200">{photoError}</p>}
-              <div className="flex items-center justify-between gap-3">
-                <Button type="button" variant="ghost" onClick={() => photoInputRef.current?.click()} disabled={isUploadingPhoto} className="text-muted-foreground hover:bg-white/5 hover:text-primary">{isUploadingPhoto ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} {isUploadingPhoto ? 'Enviando...' : 'Foto no mural'}</Button>
+              <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-1">
+                <Button type="button" variant="ghost" onClick={() => photoInputRef.current?.click()} disabled={isUploadingPhoto || recording} className="text-muted-foreground hover:bg-white/5 hover:text-primary">{isUploadingPhoto ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ImagePlus className="mr-2 h-4 w-4" />} Foto</Button>
+                <Button type="button" variant="ghost" onClick={() => void toggleRecording()} disabled={isUploadingPhoto} className={recording ? 'text-red-200 hover:bg-red-500/10' : 'text-muted-foreground hover:bg-white/5 hover:text-primary'}>{recording ? <Square className="mr-2 h-4 w-4 fill-current" /> : <Mic className="mr-2 h-4 w-4" />}{recording ? 'Parar' : 'Áudio'}</Button></div>
                 <Button 
                   type="submit" 
-                  disabled={(!content.trim() && !photoUrl) || createPost.isPending || isUploadingPhoto}
+                  disabled={(!content.trim() && !photoUrl && !audioBlob) || createPost.isPending || isUploadingPhoto || recording}
                   className="premium-cta shimmer border border-[#fff0b4]/60 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] px-8 font-bold text-[#150d05] hover:brightness-110"
                 >
                   {createPost.isPending ? "Publicando..." : "Publicar"}
@@ -218,7 +238,7 @@ export default function Forum() {
                         {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ptBR })}
                       </span>
                     </div>
-                    {(() => { const photo = splitPhotoPost(post.content); return photo ? <div className="space-y-3"><img src={photo.url} alt={`Foto publicada por ${post.guestName}`} className="max-h-[32rem] w-full rounded-2xl border border-white/10 object-cover" />{photo.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{photo.caption}</p>}</div> : <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{post.content}</p>; })()}
+                    {(() => { const photo = splitPhotoPost(post.content); const audio = splitAudioPost(post.content); return photo ? <div className="space-y-3"><img src={photo.url} alt={`Foto publicada por ${post.guestName}`} className="max-h-[32rem] w-full rounded-2xl border border-white/10 object-cover" />{photo.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{photo.caption}</p>}</div> : audio ? <div className="space-y-3 rounded-2xl border border-primary/15 bg-primary/[.06] p-3"><audio controls src={audio.url} className="w-full" />{audio.caption && <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{audio.caption}</p>}</div> : <p className="text-foreground/90 whitespace-pre-wrap break-words leading-relaxed text-[15px]">{post.content}</p>; })()}
                     
                     <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/5 pt-3">
                       <Button 

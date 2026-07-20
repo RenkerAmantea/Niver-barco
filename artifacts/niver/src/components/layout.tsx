@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useState } from 'react';
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
-import { LogOut, ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Shield, X } from "lucide-react";
+import { ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Shield, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { PresenceCard } from './presence-card';
 import { PwaControls } from './pwa-controls';
@@ -11,7 +11,7 @@ import { PushControls } from './push-controls';
 import { useGetGuest, GuestRsvpStatus, getGetGuestQueryKey } from '@workspace/api-client-react';
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { session, clearSession } = useSession();
+  const { session } = useSession();
   const [location, setLocation] = useLocation();
   const { data: currentGuest } = useGetGuest(session?.id ?? 0, { query: { enabled: !!session?.id, queryKey: getGetGuestQueryKey(session?.id ?? 0) } });
   const [showPushNudge, setShowPushNudge] = useState(false);
@@ -21,10 +21,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (standalone && !sessionStorage.getItem('niver_push_nudge_seen')) setShowPushNudge(true);
   }, [session]);
 
-  const handleLogout = () => {
-    clearSession();
-    setLocation("/");
-  };
   const dismissPushNudge = () => {
     sessionStorage.setItem('niver_push_nudge_seen', '1');
     setShowPushNudge(false);
@@ -51,9 +47,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
 
           {session && (
-            <div className="flex items-center gap-1"><NotificationBell />{session.isAdmin && <Button variant="ghost" size="icon" onClick={() => setLocation('/admin')} title="Administração" className="h-10 w-8 cursor-pointer text-primary hover:bg-transparent"><Shield className="h-4 w-4" /></Button>}<Button variant="ghost" size="icon" onClick={handleLogout} title="Sair" className="h-10 w-8 cursor-pointer rounded-xl border-0 bg-transparent hover:bg-transparent">
-              <LogOut className="h-4 w-4 text-white/60 transition-colors hover:text-[#ffb0b0]" />
-            </Button></div>
+            <div className="flex items-center gap-1"><NotificationBell />{session.isAdmin && <Button variant="ghost" size="icon" onClick={() => setLocation('/admin')} title="Administração" className="h-10 w-8 cursor-pointer text-primary hover:bg-transparent"><Shield className="h-4 w-4" /></Button>}</div>
           )}
         </div>
       </header>}

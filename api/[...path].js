@@ -39,32 +39,53 @@ function storage(path, options = {}) {
 }
 
 async function ensurePhotoBucket() {
+  const bucketSettings = {
+    public: true,
+    file_size_limit: 8 * 1024 * 1024,
+    allowed_mime_types: [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+      "audio/webm",
+      "audio/ogg",
+      "audio/mp4",
+    ],
+  };
   const response = await storage("bucket", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       id: PHOTO_BUCKET,
       name: PHOTO_BUCKET,
-      public: true,
-      file_size_limit: 8 * 1024 * 1024,
-      allowed_mime_types: [
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-        "image/heic",
-      ],
+      ...bucketSettings,
     }),
   });
   // Storage returns 400 when the bucket was already created. Both states are fine.
   if (!response.ok && response.status !== 400 && response.status !== 409) {
     throw new Error(`Photo bucket setup failed: ${response.status}`);
   }
+  // Existing buckets need their allow-list expanded before an audio can be
+  // uploaded. Updating it is idempotent and keeps the same size limit.
+  if (response.status === 400 || response.status === 409) {
+    const updated = await storage(`bucket/${PHOTO_BUCKET}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bucketSettings),
+    });
+    if (!updated.ok)
+      throw new Error(`Photo bucket update failed: ${updated.status}`);
+  }
 }
 
 async function deleteGuestMedia(guestId) {
   // Object deletion is deliberately best-effort: database cleanup must still
   // work if a bucket was never created or an old test account has no media.
-  for (const prefix of [`guests/${guestId}/`, `avatars/${guestId}/`]) {
+  for (const prefix of [
+    `guests/${guestId}/`,
+    `avatars/${guestId}/`,
+    `audio/${guestId}/`,
+  ]) {
     const listedResponse = await storage(`object/list/${PHOTO_BUCKET}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -103,6 +124,11 @@ function parsePhotoPost(content) {
     source: match[2] === "album" ? "album" : "mural",
     caption: match[3].trim(),
   };
+}
+
+function parseAudioPost(content) {
+  const match = typeof content === "string" && content.match(/^\[\[niver-audio:([^\]]+)\]\]([\s\S]*)$/);
+  return match ? { url: match[1], caption: match[2].trim() } : null;
 }
 
 async function readJson(response) {
@@ -1169,7 +1195,7 @@ export default async function handler(req, res) {
       await rest(`niver_barco_replies?post_id=eq.${postId}`, {
         method: "DELETE",
       });
-      const photo = parsePhotoPost(post.content);
+      const media = parsePhotoPost(post.content) ?? parseAudioPost(post.content);
       const deleted = await rest(`niver_barco_posts?id=eq.${postId}`, {
         method: "DELETE",
         headers: { Prefer: "return=minimal" },
@@ -1177,14 +1203,14 @@ export default async function handler(req, res) {
       if (!deleted.ok)
         return res.status(deleted.status).json(await readJson(deleted));
       if (
-        photo?.url.startsWith(
+        media?.url.startsWith(
           `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/`,
         )
       ) {
         const objectPath = decodeURIComponent(
-          photo.url.split(`/public/${PHOTO_BUCKET}/`)[1] ?? "",
+          media.url.split(`/public/${PHOTO_BUCKET}/`)[1] ?? "",
         );
-        if (objectPath.startsWith("guests/"))
+        if (objectPath.startsWith("guests/") || objectPath.startsWith("audio/"))
           await storage(`object/${PHOTO_BUCKET}`, {
             method: "DELETE",
             body: JSON.stringify({ prefixes: [objectPath] }),
@@ -1418,9 +1444,12 @@ export default async function handler(req, res) {
         "image/png",
         "image/webp",
         "image/heic",
+        "audio/webm",
+        "audio/ogg",
+        "audio/mp4",
       ]);
       if (!Number.isInteger(guestId) || !allowedTypes.has(contentType)) {
-        return res.status(400).json({ error: "Imagem inválida" });
+        return res.status(400).json({ error: "Arquivo inválido" });
       }
       const guestResponse = await rest(
         `niver_barco_guests?select=id&id=eq.${guestId}`,
@@ -1434,11 +1463,15 @@ export default async function handler(req, res) {
         "image/png": "png",
         "image/webp": "webp",
         "image/heic": "heic",
+        "audio/webm": "webm",
+        "audio/ogg": "ogg",
+        "audio/mp4": "m4a",
       }[contentType];
       const isAvatar = req.body?.purpose === "avatar";
+      const isAudio = req.body?.purpose === "audio";
       const objectName = isAvatar
         ? `avatars/${guestId}/${Date.now()}-${crypto.randomUUID()}.${extension}`
-        : `guests/${guestId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        : isAudio ? `audio/${guestId}/${Date.now()}-${crypto.randomUUID()}.${extension}` : `guests/${guestId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
       const signedResponse = await storage(
         `object/upload/sign/${PHOTO_BUCKET}/${objectName}`,
         {
@@ -1781,6 +1814,7 @@ export default async function handler(req, res) {
       const allGuestsResponse = await rest("niver_barco_guests?select=id,name");
       const allGuests = await readJson(allGuestsResponse);
       const photo = parsePhotoPost(content);
+      const audio = parseAudioPost(content);
       const mentionedIds = photo
         ? []
         : mentionedGuestIds(content, allGuests ?? []).filter((id) => id !== guestId);
@@ -1795,7 +1829,13 @@ export default async function handler(req, res) {
             tag: `photo-${posts[0].id}`,
             preference: "photos",
           }
-        : {
+        : audio ? {
+            title: "Novo áudio no mural",
+            body: `${guests?.[0]?.name ?? "Alguém"} deixou um áudio.`,
+            url: `/forum#post-${posts[0].id}`,
+            tag: `audio-${posts[0].id}`,
+            preference: "posts",
+          } : {
             title: "Nova postagem no mural",
             body: `${guests?.[0]?.name ?? "Alguém"} publicou: ${content.slice(0, 120)}`,
             url: `/forum#post-${posts[0].id}`,
