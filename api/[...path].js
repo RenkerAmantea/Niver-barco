@@ -312,6 +312,7 @@ function inviteFromContent(content) {
     if (!invite?.tokenHash || !invite?.slug) return null;
     return {
       tokenHash: String(invite.tokenHash),
+      token: typeof invite.token === "string" && invite.token.length >= 5 ? String(invite.token) : null,
       slug: String(invite.slug),
       createdAt: typeof invite.createdAt === "string" ? invite.createdAt : null,
       claimedAt: typeof invite.claimedAt === "string" ? invite.claimedAt : null,
@@ -1116,6 +1117,8 @@ export default async function handler(req, res) {
           return res.status(guestsResponse.status).json(guests);
         if (!markersResponse.ok)
           return res.status(markersResponse.status).json(markers);
+        const origin =
+          req.headers.origin || "https://renker-niver-barco.vercel.app";
         const byGuest = new Map(
           (guests ?? []).map((guest) => [guest.id, guest]),
         );
@@ -1129,6 +1132,7 @@ export default async function handler(req, res) {
                   guestId: guest.id,
                   name: guest.name,
                   slug: invite.slug,
+                  url: invite.token ? `${origin}/i/${invite.token}` : null,
                   createdAt: invite.createdAt,
                   claimedAt: invite.claimedAt,
                   rsvpStatus: guest.rsvp_status,
@@ -1173,6 +1177,7 @@ export default async function handler(req, res) {
         const token = inviteToken(name);
         const invite = {
           tokenHash: tokenHash(token),
+          token,
           slug: inviteSlug(name),
           createdAt: new Date().toISOString(),
           claimedAt: null,
@@ -1234,7 +1239,7 @@ export default async function handler(req, res) {
       if (!guest)
         return res.status(404).json({ error: "Convidado não encontrado." });
       const token = inviteToken(guest.name);
-      const updatedInvite = { ...invite, tokenHash: tokenHash(token) };
+      const updatedInvite = { ...invite, tokenHash: tokenHash(token), token };
       const updateResponse = await rest(
         `niver_barco_posts?id=eq.${marker.id}`,
         {
@@ -1792,7 +1797,7 @@ export default async function handler(req, res) {
         .filter((marker) => inviteFromContent(marker.content))
         .map((marker) => marker.guest_id));
       return res.status(200).json((guests ?? [])
-        .filter((guest) => invitedIds.has(guest.id))
+        .filter((guest) => invitedIds.has(guest.id) && guest.rsvp_status === "pending")
         .map((guest) => guestResponse(guest)));
     }
 

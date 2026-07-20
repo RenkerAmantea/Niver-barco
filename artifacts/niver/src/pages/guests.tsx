@@ -31,7 +31,7 @@ export default function Guests() {
       .then((items) => { if (active) setInvited(Array.isArray(items) ? items : []); })
       .catch(() => { if (active) setInvited([]); });
     return () => { active = false; };
-  }, []);
+  }, [guests]);
 
   if (!session) return null;
 
@@ -91,7 +91,7 @@ export default function Guests() {
       {/* Guest List Tabs */}
       <section>
         <div className="flex items-center justify-between mb-6">
-          <div><h2 className="text-2xl font-display font-semibold">Quem já respondeu</h2><p className="mt-1 text-sm text-muted-foreground">A tripulação vai aparecendo aos poucos.</p></div>
+          <div><h2 className="text-2xl font-display font-semibold">Presença da tripulação</h2><p className="mt-1 text-sm text-muted-foreground">Quem já respondeu e quem ainda está aguardando.</p></div>
         </div>
         
         <Tabs defaultValue="going" className="w-full">
@@ -106,7 +106,7 @@ export default function Guests() {
               Não vou ✗ ({notGoing.length})
             </TabsTrigger>
             <TabsTrigger value="invited" className="h-full rounded-lg text-xs sm:text-sm data-[state=active]:border data-[state=active]:border-amber-300/45 data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-100">
-              Convidados ({invited.length})
+              Aguardando ({invited.length})
             </TabsTrigger>
           </TabsList>
           
@@ -120,7 +120,7 @@ export default function Guests() {
             {renderGuestList(notGoing, "Todos parecem dispostos a ir!")}
           </TabsContent>
           <TabsContent value="invited" className="animate-in fade-in duration-500">
-            {renderGuestList(invited, "Os convites personalizados aparecerão aqui.")}
+            {renderGuestList(invited, "Ninguém está aguardando resposta agora.")}
           </TabsContent>
         </Tabs>
       </section>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
-import { Bell, CheckCheck, Inbox, Settings2 } from 'lucide-react';
+import { Bell, CheckCheck, Inbox, Settings } from 'lucide-react';
 import { useSession } from '@/hooks/use-session';
 
 type AppNotification = { id: number; title: string; body: string; url: string; readAt: string | null; createdAt: string };
@@ -19,6 +19,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showAll, setShowAll] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -61,22 +62,21 @@ export function NotificationBell() {
   };
 
   return <div ref={panelRef} className="relative">
-    <button type="button" onClick={() => { setOpen((value) => !value); void refresh(); }} aria-label={unreadCount ? `${unreadCount} notificações não lidas` : 'Abrir notificações'} aria-expanded={open} className="relative grid h-10 w-10 cursor-pointer place-items-center text-white/70 transition-colors hover:text-[#f9d98a]">
+    <button type="button" onClick={() => { setOpen((value) => !value); setShowAll(false); void refresh(); }} aria-label={unreadCount ? `${unreadCount} notificações não lidas` : 'Abrir notificações'} aria-expanded={open} className="relative grid h-10 w-10 cursor-pointer place-items-center text-white/70 transition-colors hover:text-[#f9d98a]">
       <Bell className="h-4 w-4" />
       {unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 grid min-w-4 h-4 place-items-center rounded-full border border-[#0a0c1d] bg-[#ef5350] px-1 text-[9px] font-bold leading-none text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
     </button>
-    {open && <section aria-label="Notificações" className="absolute right-0 top-12 z-[80] flex w-[min(22rem,calc(100vw-2rem))] max-h-[min(34rem,calc(100dvh-6rem))] flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#111326]/[.98] shadow-[0_22px_55px_rgba(0,0,0,.48)] backdrop-blur-2xl max-sm:fixed max-sm:inset-x-3 max-sm:top-[max(4.75rem,calc(env(safe-area-inset-top)+3.75rem))] max-sm:w-auto max-sm:max-h-[calc(100dvh-max(5.5rem,calc(env(safe-area-inset-top)+4.5rem)))]">
+    {open && <section aria-label="Notificações" className="absolute right-0 top-12 z-[80] flex w-[min(22rem,calc(100vw-2rem))] max-h-[min(34rem,calc(100dvh-6rem))] flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#111326]/[.98] shadow-[0_22px_55px_rgba(0,0,0,.48)] backdrop-blur-2xl max-sm:fixed max-sm:inset-x-3 max-sm:top-[max(4.75rem,calc(env(safe-area-inset-top)+3.75rem))] max-sm:bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] max-sm:w-auto max-sm:max-h-none">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3.5">
         <div><h2 className="font-display text-base font-semibold text-[#fff0c8]">Avisos a bordo</h2><p className="mt-0.5 text-[11px] text-white/45">Seus recados ficam guardados aqui.</p></div>
-        {unreadCount > 0 && <button type="button" onClick={() => void markAllRead()} className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-[#f9d98a] transition hover:bg-[#f6cc6b]/10"><CheckCheck className="h-3.5 w-3.5" />Ler todas</button>}
+        <div className="flex items-center gap-1">{unreadCount > 0 && <button type="button" onClick={() => void markAllRead()} aria-label="Marcar todas como lidas" title="Ler todas" className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-[#f9d98a] transition hover:bg-[#f6cc6b]/10"><CheckCheck className="h-4 w-4" /></button>}<button type="button" onClick={() => { setOpen(false); window.dispatchEvent(new Event('niver:open-push-settings')); }} aria-label="Ajustar avisos" title="Ajustar avisos" className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-[#f9d98a]/20 bg-[#f6cc6b]/8 text-[#ffe7a6] transition hover:bg-[#f6cc6b]/18"><Settings className="h-4 w-4" /></button></div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
-        {notifications.length === 0 ? <div className="grid place-items-center px-6 py-10 text-center"><span className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[.03] text-white/40"><Inbox className="h-4 w-4" /></span><p className="mt-3 text-sm font-medium text-white/75">Nenhum aviso por enquanto</p><p className="mt-1 text-xs leading-5 text-white/45">Quando houver novidade, ela aparece aqui.</p></div> : notifications.map((notification) => <button key={notification.id} type="button" onClick={() => void markRead(notification, true)} className="group flex w-full cursor-pointer gap-3 rounded-xl p-3 text-left transition hover:bg-white/[.055]">
+        {notifications.length === 0 ? <div className="grid place-items-center px-6 py-10 text-center"><span className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[.03] text-white/40"><Inbox className="h-4 w-4" /></span><p className="mt-3 text-sm font-medium text-white/75">Nenhum aviso por enquanto</p><p className="mt-1 text-xs leading-5 text-white/45">Quando houver novidade, ela aparece aqui.</p></div> : <>{(showAll ? notifications : notifications.slice(0, 6)).map((notification) => <button key={notification.id} type="button" onClick={() => void markRead(notification, true)} className="group flex w-full cursor-pointer gap-3 rounded-xl p-3 text-left transition hover:bg-white/[.055]">
           <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.readAt ? 'bg-white/15' : 'bg-[#ef5350] shadow-[0_0_0_3px_rgba(239,83,80,.12)]'}`} />
           <span className="min-w-0 flex-1"><span className="flex items-baseline justify-between gap-3"><strong className={`truncate text-sm ${notification.readAt ? 'font-medium text-white/65' : 'font-semibold text-white/95'}`}>{notification.title}</strong><time className="shrink-0 text-[10px] text-white/38">{relativeDate(notification.createdAt)}</time></span><span className="mt-1 block text-xs leading-5 text-white/55">{notification.body}</span></span>
-        </button>)}
+        </button>)}{notifications.length > 6 && !showAll && <button type="button" onClick={() => setShowAll(true)} className="mx-2 mb-2 mt-1 flex min-h-10 w-[calc(100%-1rem)] items-center justify-center rounded-xl border border-white/10 bg-white/[.03] text-xs font-semibold text-[#ffe29b] transition hover:bg-[#f6cc6b]/10">Ver mais {notifications.length - 6} aviso(s)</button>}</>}
       </div>
-      <button type="button" onClick={() => { setOpen(false); window.dispatchEvent(new Event('niver:open-push-settings')); }} className="m-2 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#f9d98a]/25 bg-[#f6cc6b]/10 px-4 text-sm font-semibold text-[#ffe7a6] transition hover:bg-[#f6cc6b]/18"><Settings2 className="h-4 w-4" />Ajustar avisos</button>
     </section>}
   </div>;
 }

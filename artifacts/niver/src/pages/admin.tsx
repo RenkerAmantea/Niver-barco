@@ -12,14 +12,17 @@ import {
   BellRing,
   Vote,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type Invite = {
   id: number;
   guestId: number;
   name: string;
   slug: string;
+  url: string | null;
   claimedAt: string | null;
   rsvpStatus: string;
 };
@@ -72,7 +75,8 @@ export default function Admin() {
     [lastCreatedUrl, setLastCreatedUrl] = useState(""),
     [copiedInvite, setCopiedInvite] = useState(false),
     [invites, setInvites] = useState<Invite[]>([]),
-    [refreshingInviteId, setRefreshingInviteId] = useState<number | null>(null);
+    [refreshingInviteId, setRefreshingInviteId] = useState<number | null>(null),
+    [expandedInviteId, setExpandedInviteId] = useState<number | null>(null);
   const [ledger, setLedger] = useState<LedgerGuest[]>([]),
     [surpriseName, setSurpriseName] = useState(""),
     [removingId, setRemovingId] = useState<number | null>(null);
@@ -226,6 +230,8 @@ export default function Admin() {
       if (!response.ok)
         throw new Error(data.error ?? "Não foi possível gerar o novo link.");
       setLastCreatedUrl(data.url);
+      setInvites((items) => items.map((item) => item.id === invite.id ? { ...item, url: data.url } : item));
+      setExpandedInviteId(invite.id);
       setCopiedInvite(false);
       setInviteStatus(
         `Novo link de ${data.name} pronto. O anterior deixou de funcionar; copie o novo abaixo.`,
@@ -239,6 +245,12 @@ export default function Admin() {
     } finally {
       setRefreshingInviteId(null);
     }
+  };
+  const inviteRsvpLabel = (rsvpStatus: Invite["rsvpStatus"]) => {
+    if (rsvpStatus === "going") return { label: "Vou", className: "border-emerald-300/45 bg-emerald-500/15 text-emerald-100" };
+    if (rsvpStatus === "maybe") return { label: "Talvez", className: "border-amber-300/45 bg-amber-500/15 text-amber-100" };
+    if (rsvpStatus === "not_going") return { label: "Não vou", className: "border-red-300/35 bg-red-500/15 text-red-100" };
+    return { label: "Aguardando", className: "border-white/12 bg-white/[.04] text-white/55" };
   };
   const setPayment = async (id: number, payment: LedgerGuest["payment"]) => {
     const r = await fetch(`/api/admin/payments/${id}`, {
@@ -617,33 +629,20 @@ export default function Admin() {
               </div>
             )}
             <div className="space-y-2">
-              {invites.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/15 p-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {invite.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {invite.claimedAt
-                        ? "abriu o convite"
-                        : "aguardando abertura"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void renewInviteLink(invite)}
-                    disabled={refreshingInviteId === invite.id}
-                    className="h-9 shrink-0 rounded-lg border border-primary/30 px-3 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
-                  >
-                    {refreshingInviteId === invite.id
-                      ? "Gerando…"
-                      : "Novo link"}
-                  </button>
-                </div>
-              ))}
+              {invites.map((invite) => {
+                const rsvp = inviteRsvpLabel(invite.rsvpStatus);
+                return <Collapsible key={invite.id} open={expandedInviteId === invite.id} onOpenChange={(open) => setExpandedInviteId(open ? invite.id : null)} className="rounded-xl border border-white/10 bg-black/15">
+                  <CollapsibleTrigger className="flex w-full items-center gap-3 p-3 text-left transition hover:bg-white/[.025]">
+                    <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{invite.name}</p><p className="mt-0.5 text-xs text-muted-foreground">{invite.claimedAt ? "abriu o convite" : "aguardando abertura"}</p></div>
+                    <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ${rsvp.className}`}>{rsvp.label}</span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-white/45 transition ${expandedInviteId === invite.id ? "rotate-180" : ""}`} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="border-t border-white/8 px-3 pb-3 pt-3">
+                    {invite.url ? <div className="flex items-center gap-2"><input readOnly value={invite.url} onFocus={(event) => event.currentTarget.select()} className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 font-mono text-[11px] text-[#ffe39a]" aria-label={`Link de convite de ${invite.name}`} /><button type="button" onClick={() => void copyInviteUrl(invite.url ?? "")} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20" aria-label={`Copiar link de ${invite.name}`}><Copy className="h-4 w-4" /></button></div> : <p className="rounded-xl border border-amber-300/15 bg-amber-300/5 p-3 text-xs leading-5 text-amber-100/75">Este é um convite antigo: o link anterior não pode ser recuperado. Gere um novo para ter um link copiável aqui.</p>}
+                    <div className="mt-3 flex justify-end"><button type="button" onClick={() => void renewInviteLink(invite)} disabled={refreshingInviteId === invite.id} className="h-9 rounded-lg border border-primary/30 px-3 text-xs font-semibold text-primary hover:bg-primary/10 disabled:opacity-50">{refreshingInviteId === invite.id ? "Gerando…" : invite.url ? "Novo link" : "Gerar link"}</button></div>
+                  </CollapsibleContent>
+                </Collapsible>;
+              })}
             </div>
             <p className="text-xs leading-5 text-white/40">
               “Novo link” invalida o anterior, para manter o convite privado.
