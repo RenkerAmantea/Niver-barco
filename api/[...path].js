@@ -1437,8 +1437,11 @@ export default async function handler(req, res) {
 
     if (req.method === "POST" && path === "/photos/upload-url") {
       const guestId = Number(req.body?.guestId);
-      const contentType =
+      const rawContentType =
         typeof req.body?.contentType === "string" ? req.body.contentType : "";
+      // MediaRecorder commonly reports `audio/webm;codecs=opus`. Storage and
+      // our allow-list use the media type itself, so discard its parameters.
+      const contentType = rawContentType.split(";", 1)[0].trim().toLowerCase();
       const allowedTypes = new Set([
         "image/jpeg",
         "image/png",

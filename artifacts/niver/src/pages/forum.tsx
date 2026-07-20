@@ -36,14 +36,34 @@ function formatAudioTime(milliseconds = 0) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
+function useAudioWaveform(src: string) {
+  const [bars, setBars] = useState<number[]>([]);
+  useEffect(() => {
+    let active = true;
+    const context = new AudioContext();
+    void fetch(src).then((response) => response.arrayBuffer()).then((buffer) => context.decodeAudioData(buffer)).then((audio) => {
+      if (!active) return;
+      const channel = audio.getChannelData(0); const count = 32; const step = Math.max(1, Math.floor(channel.length / count));
+      setBars(Array.from({ length: count }, (_, index) => {
+        let peak = 0; const start = index * step; const end = Math.min(channel.length, start + step);
+        for (let cursor = start; cursor < end; cursor += 8) peak = Math.max(peak, Math.abs(channel[cursor]));
+        return Math.max(16, Math.min(100, Math.round(peak * 180)));
+      }));
+    }).catch(() => { if (active) setBars([]); }).finally(() => void context.close());
+    return () => { active = false; };
+  }, [src]);
+  return bars;
+}
+
 function AudioPlayer({ src, durationMs }: { src: string; durationMs?: number }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const waveform = useAudioWaveform(src);
   const fallbackDuration = durationMs ?? 0;
   const total = Math.max(fallbackDuration, elapsed, 1);
   const progress = Math.min(100, (elapsed / total) * 100);
-  const bars = [34, 58, 76, 48, 92, 64, 42, 70, 88, 52, 36, 68, 82, 50, 72, 40, 60, 86, 54, 38, 66, 78, 46, 70];
+  const bars = waveform.length ? waveform : Array.from({ length: 32 }, () => 30);
   const toggle = async () => {
     const audio = audioRef.current; if (!audio) return;
     if (playing) { audio.pause(); return; }
@@ -105,8 +125,11 @@ export default function Forum() {
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
   const [audioDurationMs, setAudioDurationMs] = useState<number | null>(null);
   const [recording, setRecording] = useState(false);
+  const [liveWaveform, setLiveWaveform] = useState<number[]>([]);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingStartedAtRef = useRef<number>(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const waveformFrameRef = useRef<number | null>(null);
 
   const { data: posts, isLoading: isLoadingPosts } = useListPosts();
   const { data: guests } = useListGuests();
@@ -129,9 +152,10 @@ export default function Forum() {
     if ((!content.trim() && !photoUrl && !audioBlob) || !session?.id) return;
     let audioUrl: string | null = null;
     if (audioBlob) {
-      const signedResponse = await fetch('/api/photos/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, contentType: audioBlob.type || 'audio/webm', purpose: 'audio' }) });
+      const audioType = (audioBlob.type || 'audio/webm').split(';', 1)[0];
+      const signedResponse = await fetch('/api/photos/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ guestId: session.id, contentType: audioType, purpose: 'audio' }) });
       const signed = await signedResponse.json(); if (!signedResponse.ok) { setPhotoError(signed.error ?? 'Não foi possível preparar o áudio.'); return; }
-      const upload = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': audioBlob.type || 'audio/webm', 'x-upsert': 'false' }, body: audioBlob }); if (!upload.ok) { setPhotoError('O envio do áudio falhou.'); return; } audioUrl = signed.publicUrl;
+      const upload = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': audioType, 'x-upsert': 'false' }, body: audioBlob }); if (!upload.ok) { setPhotoError('O envio do áudio falhou.'); return; } audioUrl = signed.publicUrl;
     }
 
     createPost.mutate(
@@ -151,7 +175,7 @@ export default function Forum() {
 
   const toggleRecording = async () => {
     if (recording && recorderRef.current) { recorderRef.current.stop(); return; }
-    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const recorder = new MediaRecorder(stream); const chunks: BlobPart[] = []; recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); }; recorder.onstop = () => { stream.getTracks().forEach(track => track.stop()); const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }); const duration = Math.max(500, Date.now() - recordingStartedAtRef.current); if (blob.size > 8 * 1024 * 1024) { setPhotoError('O áudio ficou maior que 8 MB. Grave algo mais curto.'); } else { setAudioBlob(blob); setAudioDurationMs(duration); setAudioPreview(URL.createObjectURL(blob)); } setRecording(false); }; recordingStartedAtRef.current = Date.now(); recorder.start(); recorderRef.current = recorder; setRecording(true); setPhotoError(null); } catch { setPhotoError('Não foi possível acessar o microfone. Libere a permissão e tente de novo.'); }
+    try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const recorder = new MediaRecorder(stream); const context = new AudioContext(); const analyser = context.createAnalyser(); analyser.fftSize = 128; context.createMediaStreamSource(stream).connect(analyser); const frequencies = new Uint8Array(analyser.frequencyBinCount); const drawWaveform = () => { analyser.getByteFrequencyData(frequencies); const pieces = 24; const step = Math.max(1, Math.floor(frequencies.length / pieces)); setLiveWaveform(Array.from({ length: pieces }, (_, index) => { let total = 0; for (let cursor = index * step; cursor < Math.min(frequencies.length, (index + 1) * step); cursor++) total += frequencies[cursor]; return Math.max(14, Math.min(100, Math.round(total / step / 2.55))); })); waveformFrameRef.current = requestAnimationFrame(drawWaveform); }; drawWaveform(); audioContextRef.current = context; const chunks: BlobPart[] = []; recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); }; recorder.onstop = () => { if (waveformFrameRef.current) cancelAnimationFrame(waveformFrameRef.current); waveformFrameRef.current = null; void context.close(); audioContextRef.current = null; stream.getTracks().forEach(track => track.stop()); const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }); const duration = Math.max(500, Date.now() - recordingStartedAtRef.current); if (blob.size > 8 * 1024 * 1024) { setPhotoError('O áudio ficou maior que 8 MB. Grave algo mais curto.'); } else { setAudioBlob(blob); setAudioDurationMs(duration); setAudioPreview(URL.createObjectURL(blob)); } setLiveWaveform([]); setRecording(false); }; recordingStartedAtRef.current = Date.now(); recorder.start(); recorderRef.current = recorder; setRecording(true); setPhotoError(null); } catch { setPhotoError('Não foi possível acessar o microfone. Libere a permissão e tente de novo.'); }
   };
 
   const handlePhotoSelect = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -207,7 +231,7 @@ export default function Forum() {
               {mentionChoices.length > 0 && <div className="relative z-20 -mt-2 w-full max-w-xs overflow-hidden rounded-xl border border-white/12 bg-[#101126] shadow-2xl">{mentionChoices.map((guest) => <button key={guest.id} type="button" onClick={() => selectMention(guest.name)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-white/5"><span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-xs text-primary">{guest.name[0]}</span>{guest.name}</button>)}</div>}
               <input ref={photoInputRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic" onChange={handlePhotoSelect} />
               {photoUrl && <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black/30"><img src={photoUrl} alt="Prévia da foto a publicar" className="max-h-64 w-full object-cover" /><button type="button" onClick={() => setPhotoUrl(null)} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/65 text-white hover:bg-black"><X className="h-4 w-4" /></button></div>}
-              {recording && <div className="flex items-center gap-3 rounded-2xl border border-red-300/25 bg-red-500/[.08] p-3"><span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-red-500/20 text-red-200"><span className="absolute inset-0 animate-ping rounded-full bg-red-400/25" /><Mic className="relative h-4 w-4" /></span><div className="flex h-7 flex-1 items-center gap-1" aria-label="Gravando áudio">{[32,55,76,46,92,62,38,70,84,48,66,36,78,52,90,42].map((height, index) => <span key={index} className="w-1 flex-1 animate-pulse rounded-full bg-red-300/85" style={{ height: `${height}%`, animationDelay: `${index * 65}ms` }} />)}</div><span className="text-xs font-semibold text-red-100">Gravando</span></div>}
+              {recording && <div className="flex items-center gap-3 rounded-2xl border border-red-300/25 bg-red-500/[.08] p-3"><span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-red-500/20 text-red-200"><span className="absolute inset-0 animate-ping rounded-full bg-red-400/25" /><Mic className="relative h-4 w-4" /></span><div className="flex h-7 flex-1 items-center gap-1" aria-label="Gravando áudio">{(liveWaveform.length ? liveWaveform : Array.from({ length: 24 }, () => 14)).map((height, index) => <span key={index} className="w-1 flex-1 rounded-full bg-red-300/85 transition-[height] duration-75" style={{ height: `${height}%` }} />)}</div><span className="text-xs font-semibold text-red-100">Gravando</span></div>}
               {audioPreview && <div className="relative"><AudioPlayer src={audioPreview} durationMs={audioDurationMs ?? undefined} /><button type="button" aria-label="Remover áudio" onClick={() => { URL.revokeObjectURL(audioPreview); setAudioBlob(null); setAudioPreview(null); setAudioDurationMs(null); }} className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full border border-white/15 bg-[#101126] text-white/65 shadow-lg transition hover:text-white"><X className="h-3.5 w-3.5" /></button></div>}
               {photoError && <p className="text-sm text-red-200">{photoError}</p>}
               <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-1">
