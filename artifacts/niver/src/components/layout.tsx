@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSession } from "@/hooks/use-session";
 import { cn } from "@/lib/utils";
 import { ShipWheel, CalendarDays, UsersRound, MessagesSquare, Images, UserRound, Shield, X } from "lucide-react";
@@ -9,6 +9,7 @@ import { PwaControls } from './pwa-controls';
 import { NotificationBell } from './notification-bell';
 import { PushControls } from './push-controls';
 import { AnnouncementModal } from './announcement-modal';
+import { IosInstallModal, isAppleMobileBrowser, isStandaloneApp } from './ios-install-modal';
 import { useGetGuest, GuestRsvpStatus, getGetGuestQueryKey } from '@workspace/api-client-react';
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: currentGuest } = useGetGuest(session?.id ?? 0, { query: { enabled: !!session?.id, queryKey: getGetGuestQueryKey(session?.id ?? 0) } });
   const [showPushNudge, setShowPushNudge] = useState(false);
+  const [announcementPending, setAnnouncementPending] = useState(false);
+  const [announcementsChecked, setAnnouncementsChecked] = useState(false);
+  const [showIosInstall, setShowIosInstall] = useState(false);
   useEffect(() => {
     if (!session || !('Notification' in window)) return;
     const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
@@ -23,15 +27,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [session]);
 
   useEffect(() => {
+    if (!session || !isAppleMobileBrowser() || isStandaloneApp()) return;
+    if (!localStorage.getItem('niver_ios_install_seen')) setShowIosInstall(true);
+  }, [session]);
+
+  useEffect(() => { setAnnouncementsChecked(false); setAnnouncementPending(false); }, [session?.id]);
+  const markAnnouncementsChecked = useCallback(() => setAnnouncementsChecked(true), []);
+
+  useEffect(() => {
     const openSettings = () => setShowPushNudge(true);
     window.addEventListener('niver:open-push-settings', openSettings);
     return () => window.removeEventListener('niver:open-push-settings', openSettings);
+  }, []);
+
+  useEffect(() => {
+    const openGuide = () => setShowIosInstall(true);
+    window.addEventListener('niver:open-ios-install-guide', openGuide);
+    return () => window.removeEventListener('niver:open-ios-install-guide', openGuide);
   }, []);
 
   const dismissPushNudge = () => {
     sessionStorage.setItem('niver_push_nudge_seen', '1');
     setShowPushNudge(false);
   };
+  const dismissIosInstall = () => { localStorage.setItem('niver_ios_install_seen', '1'); setShowIosInstall(false); };
+  const showPresence = Boolean(announcementsChecked && session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados');
+  const showAnnouncement = announcementPending;
+  const showIosGuide = announcementsChecked && !showAnnouncement && !showPresence && showIosInstall;
+  const showPushSettings = !showAnnouncement && !showPresence && !showIosGuide && showPushNudge;
 
   const navLinks = [
     { href: "/evento", label: "Evento", icon: CalendarDays },
@@ -74,9 +97,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {navLinks.map(({ href, label, icon: Icon, featured }) => <Link key={href} href={href} aria-current={location === href ? 'page' : undefined} className={cn('bottom-nav-item', featured && 'bottom-nav-item-center')}><Icon className="bottom-nav-icon" /> <span className="bottom-nav-label">{label}</span></Link>)}
       </nav>}
       <PwaControls />
-      {session && <AnnouncementModal />}
-      {showPushNudge && <div className="fixed inset-0 z-[75] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div role="dialog" aria-modal="true" aria-label="Configurar avisos do barco" className="relative w-full max-w-md space-y-3"><button type="button" onClick={dismissPushNudge} aria-label="Fechar avisos" className="absolute -right-1 -top-1 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/12 bg-[#101126]/95 text-white/60 shadow-lg transition hover:border-primary/35 hover:text-primary"><X className="h-4 w-4" /></button><PushControls /><button type="button" onClick={dismissPushNudge} className="premium-cta shimmer mx-auto flex min-h-11 items-center justify-center rounded-xl border border-[#fff0b4]/60 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] px-8 text-sm font-semibold text-[#150d05]">Pronto</button></div></div>}
-      {session && currentGuest?.rsvpStatus === GuestRsvpStatus.pending && location !== '/convidados' && <div className="fixed inset-0 z-[70] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md"><PresenceCard /></div></div>}
+      {session && <AnnouncementModal enabled={showAnnouncement} onPendingChange={setAnnouncementPending} onChecked={markAnnouncementsChecked} />}
+      <IosInstallModal open={showIosGuide} onClose={dismissIosInstall} />
+      {showPushSettings && <div className="fixed inset-0 z-[75] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div role="dialog" aria-modal="true" aria-label="Configurar avisos do barco" className="relative w-full max-w-md space-y-3"><button type="button" onClick={dismissPushNudge} aria-label="Fechar avisos" className="absolute -right-1 -top-1 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/12 bg-[#101126]/95 text-white/60 shadow-lg transition hover:border-primary/35 hover:text-primary"><X className="h-4 w-4" /></button><PushControls /><button type="button" onClick={dismissPushNudge} className="premium-cta shimmer mx-auto flex min-h-11 items-center justify-center rounded-xl border border-[#fff0b4]/60 bg-gradient-to-r from-[#ffe399] via-[#efbd4f] to-[#c87520] px-8 text-sm font-semibold text-[#150d05]">Pronto</button></div></div>}
+      {showPresence && <div className="fixed inset-0 z-[70] grid place-items-center bg-[#050617]/70 p-4 backdrop-blur-sm"><div className="w-full max-w-md"><PresenceCard /></div></div>}
     </div>
   );
 }

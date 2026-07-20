@@ -15,7 +15,7 @@ type Announcement = {
   totalVotes: number;
 };
 
-export function AnnouncementModal() {
+export function AnnouncementModal({ enabled = true, onPendingChange, onChecked }: { enabled?: boolean; onPendingChange?: (pending: boolean) => void; onChecked?: () => void }) {
   const { session } = useSession();
   const [items, setItems] = useState<Announcement[]>([]);
   const [open, setOpen] = useState(false);
@@ -29,11 +29,20 @@ export function AnnouncementModal() {
       const data = await response.json();
       const next = Array.isArray(data.announcements) ? data.announcements : [];
       setItems(next);
-      if (next.some((item: Announcement) => !item.dismissed)) setOpen(true);
+      const pending = next.some((item: Announcement) => !item.dismissed);
+      onPendingChange?.(pending);
+      onChecked?.();
+      if (pending && enabled) setOpen(true);
     } catch {
       // Um comunicado não deve impedir a pessoa de usar o app sem rede.
+      onChecked?.();
     }
-  }, [session?.id]);
+  }, [enabled, onChecked, onPendingChange, session?.id]);
+
+  useEffect(() => {
+    if (enabled && items.some((item) => !item.dismissed)) setOpen(true);
+    if (!enabled) setOpen(false);
+  }, [enabled, items]);
 
   useEffect(() => {
     void load();
