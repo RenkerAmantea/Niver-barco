@@ -143,17 +143,17 @@ Fase 7 concluída. Convites novos usam nome + 8 caracteres aleatórios (48 bits)
 
 ### Fase 8: Ativação segura de convite e auditoria de push
 
-- [~] **T8.1** — Trocar a abertura automática do convite por uma tela de boas-vindas que cria a senha antes de ativar o perfil.
+- [x] **T8.1** — Trocar a abertura automática do convite por uma tela de boas-vindas que cria a senha antes de ativar o perfil.
   - Verificação: primeiro acesso não cria sessão sem senha; senha válida ativa o perfil; segundo acesso ao mesmo URL não revela nem entra no perfil.
-- [ ] **T8.2** — Ajustar o FAQ para encaminhar acompanhante ao link público normal com cópia fácil.
+- [x] **T8.2** — Ajustar o FAQ para encaminhar acompanhante ao link público normal com cópia fácil.
   - Verificação: FAQ mostra o URL público e o botão copia com feedback.
-- [ ] **T8.3** — Encerrar o código privado em quatro dígitos com proteção anti-tentativa e revisar os links existentes.
+- [x] **T8.3** — Encerrar o código privado em quatro dígitos com proteção anti-tentativa e revisar os links existentes.
   - Verificação: novo link tem nome + quatro dígitos; tentativas excessivas são bloqueadas; links antigos continuam válidos até renovados.
-- [ ] **T8.4** — Auditar inscrições push e a contagem do admin, expondo diagnóstico privado e corrigindo o motivo de `0 aparelhos`.
+- [x] **T8.4** — Auditar inscrições push e a contagem do admin, expondo diagnóstico privado e corrigindo o motivo de `0 aparelhos`.
   - Verificação: painel mostra aparelhos inscritos; envio de teste retorna contagem consistente ou explica o bloqueio concreto.
-- [ ] **T8.5** — QA de API, desktop/mobile, produção e limpeza dos dados temporários.
+- [x] **T8.5** — QA de API, desktop/mobile, produção e limpeza dos dados temporários.
   - Verificação: build/typecheck passam; convite, FAQ e push passam em produção; aliases têm o mesmo bundle.
 
 ## Estado atual
 
-Fase 8 em execução: convite individual deixa de criar uma sessão silenciosamente, o link fica compacto com defesa contra tentativas e o push ganha diagnóstico verificável.
+Fase 8 concluída. Em produção, convite novo segue o formato `nome-1234`, pede senha antes de ativar e se torna inacessível pelo mesmo URL após a ativação. O FAQ oferece cópia do link público normal. A auditoria de push confirma VAPID configurado e par de chaves consistente; a contagem atual é realmente zero inscrições salvas, e o admin deixa isso explícito em vez de fingir entrega. QA real: convite de 4 dígitos criado, senha curta recusada, ativação válida concluída, segundo acesso devolveu 409, FAQ/cópia inspecionados, aliases com o mesmo bundle e perfil temporário removido.
